@@ -1,0 +1,1428 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Lucy, an automated job-search assistant for college students.">
+<style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Lucy Job Search</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Nunito:wght@400;600;700;800&display=swap">
+<style>
+/* Layout: one rounded chat card filling the window (header, scrolling conversation, suggestion chips, composer) on a soft lavender field. */
+:root{
+  --bg:#F5F1FC; --bg-glow:#E8DEFA;
+  --surface:#FFFFFF; --bubble:#F2EDFB; --bubble-ink:#2A2340;
+  --ink:#2A2340; --muted:#665E80; --line:#E3DBF3;
+  --accent:#6A47C2; --accent-ink:#FFFFFF; --accent-soft:#EDE6FB; --accent-hover:#5A3BAE;
+  --user:#6A47C2; --user-ink:#FFFFFF;
+  --ok:#25704F; --ok-soft:#E3F4EC; --warn:#8A5300; --warn-soft:#FBF0DD;
+  --scrim:rgba(30,20,50,.38);
+  --shadow:0 24px 60px -24px rgba(74,48,140,.35), 0 2px 6px rgba(74,48,140,.06);
+  --font-display:"Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-body:"Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --fs:16px;
+  --r-card:28px; --r-bubble:22px; --r-pill:999px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#15111D; --bg-glow:#2A2140;
+  --surface:#1E1829; --bubble:#2A2238; --bubble-ink:#EEE9F8;
+  --ink:#EEE9F8; --muted:#B4ABCB; --line:#382F4C;
+  --accent:#B7A0F0; --accent-ink:#1B1428; --accent-soft:#33294A; --accent-hover:#C9B6F6;
+  --user:#7B5AD3; --user-ink:#FFFFFF;
+  --ok:#7BD7AD; --ok-soft:#1D3329; --warn:#F2C072; --warn-soft:#3A2C14;
+  --scrim:rgba(0,0,0,.55);
+  --shadow:0 24px 60px -24px rgba(0,0,0,.6);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#15111D; --bg-glow:#2A2140;
+  --surface:#1E1829; --bubble:#2A2238; --bubble-ink:#EEE9F8;
+  --ink:#EEE9F8; --muted:#B4ABCB; --line:#382F4C;
+  --accent:#B7A0F0; --accent-ink:#1B1428; --accent-soft:#33294A; --accent-hover:#C9B6F6;
+  --user:#7B5AD3; --user-ink:#FFFFFF;
+  --ok:#7BD7AD; --ok-soft:#1D3329; --warn:#F2C072; --warn-soft:#3A2C14;
+  --scrim:rgba(0,0,0,.55);
+  --shadow:0 24px 60px -24px rgba(0,0,0,.6);
+  color-scheme:dark}
+
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:var(--fs);line-height:1.5;margin:0;
+  background-image:radial-gradient(60% 50% at 15% 10%,var(--bg-glow),transparent 70%),radial-gradient(50% 45% at 90% 95%,var(--bg-glow),transparent 70%);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px;box-sizing:border-box}
+body.big{--fs:19px}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+.sr{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.skip{position:absolute;left:16px;top:-60px;background:var(--accent);color:var(--accent-ink);padding:10px 16px;border-radius:var(--r-pill);z-index:40;font-weight:700}
+.skip:focus{top:12px}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+.stage{height:100%;display:flex;justify-content:center}
+.chat{width:100%;max-width:780px;height:100%;display:flex;flex-direction:column;background:var(--surface);
+  border-radius:var(--r-card);box-shadow:var(--shadow);border:1px solid var(--line);overflow:hidden;min-height:0}
+
+/* header */
+.head{display:flex;align-items:center;gap:14px;padding:16px 18px 12px;border-bottom:1px solid var(--line)}
+.mark{flex:none;width:44px;height:44px;border-radius:16px 16px 16px 6px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;
+  font-family:var(--font-display);font-weight:700;font-size:24px;font-style:italic}
+.who{min-width:0;flex:1}
+.who h1{margin:0;font-family:var(--font-display);font-weight:600;font-size:1.35em;line-height:1.15;letter-spacing:-.01em}
+.who p{margin:2px 0 0;font-size:.82em;color:var(--muted);font-weight:600}
+.fresh{display:inline-flex;align-items:center;gap:6px;margin-top:5px;font-size:.74em;font-weight:800;color:var(--ok);background:var(--ok-soft);padding:2px 10px 2px 8px;border-radius:var(--r-pill);font-variant-numeric:tabular-nums;max-width:100%;white-space:nowrap}
+.fresh::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;background:currentColor;animation:pulse 2.4s ease-in-out infinite}
+.fresh.old{color:var(--warn);background:var(--warn-soft)}
+.fresh.old::before{animation:none}
+.narrow-only{display:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.tools{display:flex;gap:2px;justify-content:flex-end;flex:none}
+.icon{width:40px;height:40px;border-radius:50%;border:0;background:transparent;color:var(--accent);display:grid;place-items:center;cursor:pointer;flex:none}
+.icon:hover{background:var(--accent-soft)}
+.icon svg{width:21px;height:21px}
+.progress{height:4px;background:var(--accent-soft);flex:none}
+.progress span{display:block;height:100%;width:0;background:var(--accent);border-radius:0 4px 4px 0;transition:width .4s ease}
+
+/* conversation */
+.log{flex:1;min-height:0;overflow-y:auto;padding:18px 20px 12px;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth;overscroll-behavior:contain}
+.day{align-self:stretch;display:flex;align-items:center;gap:12px;color:var(--muted);font-size:.8em;font-weight:700;margin:2px 0 6px}
+.day::before,.day::after{content:"";flex:1;height:1px;background:var(--line)}
+.row{display:flex;align-items:flex-end;gap:8px;max-width:100%;flex:none}
+.row.bot{align-self:flex-start}
+.row.user{align-self:flex-end;flex-direction:row-reverse}
+.name{font-size:.78em;font-weight:800;color:var(--muted);margin:6px 0 -4px 14px;flex:none}
+.bubble{padding:12px 16px;border-radius:var(--r-bubble);max-width:min(560px,100%);min-width:0;overflow-wrap:anywhere;white-space:pre-wrap}
+.bot .bubble{background:var(--bubble);color:var(--bubble-ink);border-bottom-left-radius:8px}
+.user .bubble{background:var(--user);color:var(--user-ink);border-bottom-right-radius:8px}
+.time{font-size:.72em;color:var(--muted);flex:none;padding-bottom:4px}
+.bubble.wide{max-width:100%;width:100%;white-space:normal;background:transparent;padding:0}
+.row.full{align-self:stretch}
+.note{font-size:.85em;color:var(--muted)}
+.bubble a{color:var(--accent);font-weight:800}
+
+.typing{display:inline-flex;gap:5px;padding:16px 18px}
+.typing i{width:8px;height:8px;border-radius:50%;background:var(--accent);opacity:.35;animation:blink 1.2s infinite}
+.typing i:nth-child(2){animation-delay:.2s}.typing i:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:.9;transform:translateY(-3px)}}
+.row.in{animation:rise .28s ease-out}
+@keyframes rise{from{opacity:.001;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* job cards */
+.results{display:grid;gap:10px}
+.openall{justify-self:start;font:inherit;font-size:.86em;font-weight:800;color:var(--accent);background:var(--accent-soft);border:0;border-radius:var(--r-pill);padding:8px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+.openall svg{width:16px;height:16px}
+.job{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:14px 16px;display:grid;gap:8px}
+.job.applied{border-color:var(--ok)}
+.job h3{margin:0;font-family:var(--font-display);font-weight:600;font-size:1.08em;line-height:1.25}
+.meta{font-size:.86em;color:var(--muted);font-weight:600;display:flex;flex-wrap:wrap;gap:4px 12px}
+.jtop{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.age{display:inline-flex;align-items:center;gap:5px;font-size:.76em;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.clock{width:12px;height:12px;border:1.8px solid currentColor;border-radius:50%;position:relative;flex:none}
+.clock::after{content:"";position:absolute;left:4px;top:1.5px;width:2.5px;height:4px;border-left:1.6px solid currentColor;border-bottom:1.6px solid currentColor}
+.fit{display:inline-block;font-size:.72em;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 10px;border-radius:var(--r-pill);background:var(--accent-soft);color:var(--accent)}
+.fit.done{background:var(--ok-soft);color:var(--ok)}
+.sum{margin:0;font-size:.93em}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-size:.8em;font-weight:700;padding:3px 10px;border-radius:var(--r-pill)}
+.tag.ok{background:var(--ok-soft);color:var(--ok)}
+.tag.warn{background:var(--warn-soft);color:var(--warn)}
+.jact{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.jact a,.jact button{font:inherit;font-size:.86em;font-weight:800;border-radius:var(--r-pill);padding:7px 14px;cursor:pointer;text-decoration:none}
+.jact a{background:var(--accent);color:var(--accent-ink)}
+.jact a:hover{background:var(--accent-hover)}
+.jact button{background:transparent;border:1.5px solid var(--line);color:var(--ink)}
+.jact button:hover{border-color:var(--accent)}
+.jact button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.jact button.applied[aria-pressed="true"]{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
+.src{font-size:.75em;color:var(--muted);margin-left:auto}
+
+/* suggestions */
+.suggest{padding:10px 20px 4px;border-top:1px solid var(--line);flex:none}
+.suggest[hidden]{display:none!important}
+.suggest fieldset{border:0;margin:0;padding:0;min-width:0}
+.suggest legend{font-size:.78em;font-weight:800;color:var(--muted);padding:0;margin-bottom:8px;letter-spacing:.03em}
+.chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;max-height:9.5em;overflow-y:auto;padding:2px}
+.chip{font:inherit;font-size:.92em;font-weight:700;color:var(--accent);background:var(--surface);border:1.5px solid var(--accent);border-radius:var(--r-pill);padding:8px 16px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;line-height:1.2;text-align:left}
+.chip:hover{background:var(--accent-soft)}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.chip[aria-pressed="true"]::before{content:"";width:12px;height:7px;border-left:2.5px solid currentColor;border-bottom:2.5px solid currentColor;transform:rotate(-45deg) translateY(-2px)}
+.chip.ghost{border-style:dashed;color:var(--muted);border-color:var(--line)}
+.chip.ghost:hover{color:var(--accent);border-color:var(--accent)}
+.chip:disabled{opacity:.5;cursor:default}
+.chip.solid{background:var(--accent);color:var(--accent-ink)}
+.sact{display:flex;justify-content:flex-end;gap:8px;margin-top:8px;flex-wrap:wrap}
+.hint{font-size:.78em;color:var(--muted);margin-right:auto;align-self:center;font-weight:600}
+
+/* composer */
+.composer{display:flex;gap:8px;align-items:center;padding:10px 16px 6px;flex:none}
+.field{flex:1;min-width:0;display:flex;align-items:center;background:var(--bubble);border-radius:var(--r-pill);padding:4px 6px 4px 18px;border:1.5px solid transparent}
+.field:focus-within{border-color:var(--accent)}
+.field input{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font:inherit;padding:10px 0;outline:none}
+.field input::placeholder{color:var(--muted)}
+.send{width:46px;height:46px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;cursor:pointer;flex:none}
+.send:hover{background:var(--accent-hover)}
+.send:disabled{opacity:.5;cursor:default}
+.send svg{width:20px;height:20px}
+.foot{margin:0;text-align:center;font-size:.72em;color:var(--muted);padding:2px 16px 10px;font-weight:600;flex:none}
+
+/* sheets (settings, setup) */
+.panel{position:fixed;inset:0;background:var(--scrim);display:grid;place-items:center;z-index:30;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.panel[hidden]{display:none!important}
+.sheet{background:var(--surface);color:var(--ink);border-radius:24px;max-width:500px;width:100%;max-height:100%;overflow-y:auto;padding:22px;box-shadow:var(--shadow);display:grid;gap:14px}
+.sheet h2{margin:0;font-family:var(--font-display);font-weight:600;font-size:1.3em}
+.sheet h3{margin:0;font-size:.78em;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.sheet p{margin:0;font-size:.92em;color:var(--muted)}
+.sec{display:grid;gap:8px}
+.opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.opt{font:inherit;text-align:left;background:var(--surface);color:var(--ink);border:1.5px solid var(--line);border-radius:16px;padding:10px 12px;cursor:pointer;display:grid;gap:2px}
+.opt b{font-size:.95em}
+.opt span{font-size:.82em;color:var(--muted)}
+.opt[aria-checked="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg .chip[aria-checked="true"]{background:var(--accent);color:var(--accent-ink)}
+.toggle{display:flex;align-items:flex-start;gap:12px;cursor:pointer;font-size:.93em}
+.toggle input{appearance:none;flex:none;width:42px;height:24px;border-radius:12px;background:var(--line);position:relative;cursor:pointer;margin:1px 0 0;transition:background .2s}
+.toggle input::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--surface);transition:transform .2s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.toggle input:checked{background:var(--accent)}
+.toggle input:checked::after{transform:translateX(18px)}
+.toggle small{display:block;color:var(--muted);font-size:.86em}
+.row2{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.fair{background:var(--bubble);border-radius:16px;padding:12px 14px;font-size:.88em;color:var(--bubble-ink)}
+.fair ul{margin:6px 0 0;padding-left:18px}
+.msgline{min-height:1.2em;font-size:.88em;color:var(--muted)}
+
+/* full-screen job list */
+.board{position:fixed;inset:0;z-index:35;background:var(--bg);display:flex;flex-direction:column;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.board[hidden]{display:none!important}
+.bhead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));background:var(--surface);border-bottom:1px solid var(--line)}
+.bhead h2{margin:0;font-family:var(--font-display);font-weight:600;font-size:1.25em;flex:1;min-width:0}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs button{font:inherit;font-size:.88em;font-weight:800;border-radius:var(--r-pill);padding:7px 14px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.blist{flex:1;min-height:0;overflow-y:auto;padding:16px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
+.bgrid{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;align-items:start}
+.empty{max-width:520px;margin:40px auto;text-align:center;color:var(--muted)}
+
+@media (max-width:520px){
+  body{padding-block:0;padding-left:0;padding-right:0}
+  .chat{border-radius:0;border:0}
+  .head{padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(8px,env(safe-area-inset-right,0px));gap:10px}
+  .log,.suggest{padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(14px,env(safe-area-inset-right,0px))}
+  .composer{padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+  .who p{display:none}
+  .time{display:none}
+  .icon{width:36px;height:36px}
+  .wide-only{display:none}
+  .narrow-only{display:inline}
+  .bgrid{grid-template-columns:1fr}
+  .bhead .tabs{order:3;width:100%}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+  .typing i{opacity:.6}
+}
+</style>
+
+<a class="skip" href="#msg">Skip to message box</a>
+<div class="stage">
+<main class="chat" aria-labelledby="ttl">
+  <header class="head">
+    <div class="mark" aria-hidden="true">L</div>
+    <div class="who">
+      <h1 id="ttl">Lucy</h1>
+      <p id="sub">Automated job-search assistant</p>
+      <span class="fresh" id="fresh" hidden></span>
+    </div>
+    <div class="tools">
+      <button class="icon" id="bTheme" type="button" aria-label="Switch to dark mode" title="Light / dark mode"><svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg></button>
+      <button class="icon" id="bRestart" type="button" aria-label="Start over" title="Start over"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg></button>
+      <button class="icon" id="bSettings" type="button" aria-label="Settings and privacy" title="Settings and privacy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
+    </div>
+  </header>
+  <div class="progress" aria-hidden="true"><span id="bar"></span></div>
+
+  <section class="log" id="log" role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversation with Lucy" tabindex="-1"></section>
+  <div class="sr" id="status" role="status" aria-live="polite"></div>
+
+  <section class="suggest" id="suggest" hidden aria-label="Suggested replies"></section>
+
+  <form class="composer" id="form" autocomplete="off">
+    <label class="sr" for="msg">Message Lucy</label>
+    <div class="field">
+      <input id="msg" type="text" placeholder="Type a reply or pick above" enterkeyhint="send">
+      <button class="icon" id="bAttach" type="button" aria-label="Attach your résumé (PDF, Word, or text)" title="Attach résumé"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20.5 11.5-8.3 8.3a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.7-7.7"/></svg></button>
+      <input id="file" type="file" accept=".pdf,.docx,.txt,.md" hidden>
+    </div>
+    <button class="send" id="bSend" type="submit" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+  </form>
+  <p class="foot">Lucy is a bot. Listings come from public company job boards. Always confirm details on the employer's site.</p>
+</main>
+</div>
+
+<!-- first-run setup -->
+<div class="panel" id="setup" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="suTitle">
+    <h2 id="suTitle">Make Lucy yours</h2>
+    <p>Pick how Lucy talks to you. You can change this anytime in Settings.</p>
+    <div class="sec">
+      <h3 id="suToneL">Lucy's tone</h3>
+      <div class="opts" role="radiogroup" aria-labelledby="suToneL" id="suTone"></div>
+    </div>
+    <div class="sec">
+      <h3 id="suThemeL">Look</h3>
+      <div class="seg" role="radiogroup" aria-labelledby="suThemeL" id="suTheme"></div>
+    </div>
+    <div class="row2">
+      <button class="chip ghost" type="button" id="suSkip">Skip, use standard</button>
+      <button class="chip solid" type="button" id="suGo">Start</button>
+    </div>
+  </div>
+</div>
+
+<!-- settings -->
+<div class="panel" id="settings" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="stTitle">
+    <h2 id="stTitle">Settings and privacy</h2>
+    <div class="sec">
+      <h3 id="stToneL">Lucy's tone</h3>
+      <div class="opts" role="radiogroup" aria-labelledby="stToneL" id="stTone"></div>
+    </div>
+    <div class="sec">
+      <h3 id="stThemeL">Look</h3>
+      <div class="seg" role="radiogroup" aria-labelledby="stThemeL" id="stTheme"></div>
+      <label class="toggle"><input type="checkbox" id="tBig"><span>Larger text</span></label>
+      <label class="toggle"><input type="checkbox" id="tFast"><span>Faster replies<small>Shortens Lucy's typing pause.</small></span></label>
+    </div>
+    <div class="sec">
+      <h3>Privacy</h3>
+      <label class="toggle"><input type="checkbox" id="tResearch"><span>Use my answers to improve Lucy<small>Helps our student team improve Lucy. Only the team can see this log. No name, contact info, or résumé text is included.</small></span></label>
+      <label class="toggle"><input type="checkbox" id="tRemember"><span>Remember my answers on this device<small>So you can pick up where you left off next time. Stays in this browser only.</small></span></label>
+      <label class="toggle"><input type="checkbox" id="tResume"><span>Save my résumé on this device<small>So you don't have to upload it again. Never sent to the research log.</small></span></label>
+      <div class="row2">
+        <button class="chip ghost" type="button" id="stMine">Download my chat (CSV)</button>
+        <button class="chip ghost" type="button" id="stDelete">Delete my saved data</button>
+      </div>
+      <p class="msgline" id="stMsg" role="status" aria-live="polite"></p>
+    </div>
+    <div class="fair">
+      <b>How Lucy keeps matching fair</b>
+      <ul>
+        <li>Lucy only uses job type, field, skills, experience, location, work style, pay, start date, and sponsorship needs.</li>
+        <li>Lucy never asks for or uses your name, gender, race, ethnicity, age, religion, disability, or similar details.</li>
+        <li>If your résumé includes your name, contact info, or personal details like these, Lucy removes them before reading it.</li>
+      </ul>
+    </div>
+    <div class="sec" id="hostSec" hidden>
+      <h3>Host only</h3>
+      <p id="hostStats"></p>
+      <div class="row2"><button class="chip ghost" type="button" id="stAll">Download research log (CSV)</button></div>
+    </div>
+    <div class="row2"><button class="chip solid" type="button" id="stClose">Done</button></div>
+  </div>
+</div>
+
+<!-- full-screen job list -->
+<section class="board" id="board" hidden role="dialog" aria-modal="true" aria-labelledby="bTitle">
+  <div class="bhead">
+    <h2 id="bTitle">Your jobs</h2>
+    <div class="tabs" role="tablist" aria-label="Job lists">
+      <button type="button" role="tab" id="tabAll" aria-selected="true">Matches</button>
+      <button type="button" role="tab" id="tabSaved" aria-selected="false">Saved</button>
+      <button type="button" role="tab" id="tabApplied" aria-selected="false">Applied</button>
+    </div>
+    <button class="icon" type="button" id="bClose" aria-label="Close full list" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>
+  <div class="blist" id="blist" role="tabpanel" aria-labelledby="tabAll"><div class="bgrid" id="bgrid"></div></div>
+</section>
+
+<script>
+(() => {
+"use strict";
+/* ===== config ===== */
+const SURVEY_URL = "";      // Google Form link for the feedback survey
+const LOG_ENDPOINT = "";    // Google Apps Script web-app URL (used when Lucy runs outside Claude, e.g. GitHub Pages)
+
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const lc = s => String(s || "").toLowerCase().trim();
+const uniq = a => [...new Set(a.filter(Boolean))];
+const h = (tag, attrs = {}, ...kids) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === "class") e.className = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v === true ? "" : v);
+  }
+  for (const k of kids.flat()) if (k != null) e.append(k.nodeType ? k : document.createTextNode(String(k)));
+  return e;
+};
+const LS = { get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }, del(k){ try { localStorage.removeItem(k); } catch {} } };
+const SS = { get(k){ try { return JSON.parse(sessionStorage.getItem(k)); } catch { return null; } }, set(k,v){ try { sessionStorage.setItem(k, JSON.stringify(v)); } catch {} }, del(k){ try { sessionStorage.removeItem(k); } catch {} } };
+
+/* ===== preferences ===== */
+const PREFS = Object.assign({ tone:"standard", theme:"system", big:false, fast:false, remember:false, saveResume:false, setupDone:false }, LS.get("lucy.prefs") || {});
+const savePrefs = () => LS.set("lucy.prefs", PREFS);
+const hostTheme = document.documentElement.getAttribute("data-theme");
+const SUN = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
+const MOON = '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>';
+function isDark(){
+  const t = document.documentElement.getAttribute("data-theme");
+  if (t) return t === "dark";
+  return window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
+}
+function applyTheme(){
+  const r = document.documentElement;
+  if (PREFS.theme === "light" || PREFS.theme === "dark") r.setAttribute("data-theme", PREFS.theme);
+  else if (hostTheme) r.setAttribute("data-theme", hostTheme); else r.removeAttribute("data-theme");
+  const dark = isDark();
+  $("themeIcon").innerHTML = dark ? SUN : MOON;
+  $("bTheme").setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
+  document.body.classList.toggle("big", !!PREFS.big);
+}
+try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme); } catch {}
+
+/* ===== tone ===== */
+const TONES = [
+  { id:"standard", name:"Standard", eg:"Clear and friendly." },
+  { id:"friendly", name:"Warm and upbeat", eg:"Extra encouraging." },
+  { id:"professional", name:"Professional", eg:"Polished and formal." },
+  { id:"brief", name:"Straight to the point", eg:"As short as possible." }
+];
+const V = {
+  greet1:{ standard:"Hi! I'm Lucy, an automated job-search assistant. I'll ask a few quick questions, then show real openings that fit you.",
+    friendly:"Hi there! I'm Lucy, an automated job-search assistant. A few quick questions and I'll show you real openings picked just for you.",
+    professional:"Hello. I'm Lucy, an automated job-search assistant. I'll ask a few brief questions and then show current openings that match your profile.",
+    brief:"Hi, I'm Lucy, an automated job-search bot. Quick questions, then real jobs." },
+  greet2:{ standard:"I can't apply for you or promise a job. You're welcome to skip anything you'd like.",
+    friendly:"Just so you know, I can't apply for you or promise a job. You're welcome to skip anything you'd like!",
+    professional:"Please note that I cannot apply on your behalf or guarantee a job. You are welcome to skip any question.",
+    brief:"I can't apply for you or promise a job. Skip anything you like." },
+  consent:{ standard:"Do we have your consent to use your answers to help improve Lucy?",
+    friendly:"Is it okay if we use your answers to help make Lucy better?",
+    professional:"Do we have your consent to use your responses to improve Lucy?",
+    brief:"Okay to use your answers to improve Lucy?" },
+  consentYes:{ standard:"Thanks! You can change this anytime in Settings.", friendly:"Thank you, that helps a lot! You can change this anytime in Settings.", professional:"Thank you. You may change this at any time in Settings.", brief:"Thanks. Change anytime in Settings." },
+  consentNo:{ standard:"Got it. Nothing goes to the research log.", friendly:"Totally fine! Nothing goes to the research log.", professional:"Understood. Nothing will be sent to the research log.", brief:"Okay, nothing shared." },
+  remember:{ standard:"Want me to remember your answers on this device, so you can pick up where you left off next time?",
+    friendly:"Want me to remember your answers on this device? Then you can jump right back in next time!",
+    professional:"Would you like me to save your answers on this device so you can resume later?",
+    brief:"Save answers on this device for next time?" },
+  rememberYes:{ standard:"Done. They stay in this browser only, and you can delete them anytime in Settings.", brief:"Saved on this device only." },
+  rememberNo:{ standard:"No problem. Nothing is kept after you close this page.", friendly:"No problem at all! Nothing is kept after you close this page.", brief:"Okay, nothing kept." },
+  welcome:{ standard:"Welcome back! Want to use the answers you saved last time?", friendly:"Welcome back, great to see you! Want to use the answers you saved last time?", professional:"Welcome back. Would you like to use your previously saved answers?", brief:"Welcome back. Use saved answers?" },
+  q_type:{ standard:"First up: what kind of role are you after?", friendly:"Let's start easy! What kind of role are you hoping for?", professional:"To begin, which type of position are you seeking?", brief:"Role type?" },
+  q_stage:{ standard:"Where are you right now?", friendly:"Where are you in your journey right now?", professional:"What is your current stage?", brief:"Your stage?" },
+  q_major:{ standard:"What's your major or field? Type it if it's not here.", friendly:"What are you studying? Pick one or type your own!", professional:"What is your major or field of study? You may type it if it is not listed.", brief:"Major or field?" },
+  q_skills:{ standard:"What are you good at? Pick a few, or attach your résumé and I'll pull them out.", friendly:"What are you great at? Pick a few, or drop in your résumé and I'll find them for you!", professional:"Which skills would you like to highlight? Select several, or attach your résumé and I will extract them.", brief:"Top skills? (or attach résumé)" },
+  q_exp:{ standard:"What experience do you have so far?", friendly:"What have you done so far? Every bit counts!", professional:"What relevant experience do you have?", brief:"Experience so far?" },
+  q_interests:{ standard:"Which areas sound exciting?", friendly:"Which areas get you excited?", professional:"Which industries interest you?", brief:"Interests?" },
+  q_style:{ standard:"How do you want to work?", friendly:"Where do you like to work best?", professional:"What work arrangement do you prefer?", brief:"Remote, hybrid, or on-site?" },
+  q_where:{ standard:"Where should I look? Pick or type a city.", friendly:"Where would you love to work? Pick or type a city!", professional:"Which locations should I search? Select or type a city.", brief:"Location?" },
+  q_pay:{ standard:"Any minimum salary in mind?", friendly:"Is there a salary you're hoping for?", professional:"Do you have a minimum salary requirement?", brief:"Minimum salary?" },
+  q_start:{ standard:"When could you start?", friendly:"When would you be ready to start?", professional:"What is your earliest start date?", brief:"Start date?" },
+  q_visa:{ standard:"Last one: will you need visa sponsorship to work in the US? This only helps me filter.", friendly:"Last one, promise! Will you need visa sponsorship to work in the US? I only use this to filter.", professional:"Finally, will you require visa sponsorship to work in the United States? This is used only for filtering.", brief:"Need visa sponsorship? (filter only)" },
+  ack:{ standard:"Got it. I'll look for jobs that mention “{x}”.", friendly:"Love it! I'll look for jobs that mention “{x}”.", professional:"Noted. I will search for roles that mention “{x}”.", brief:"Noted: “{x}”." },
+  results:{ standard:"I checked {n} live listings. Here are your best matches.", friendly:"I looked through {n} live listings and found some great matches for you!", professional:"I reviewed {n} current listings. These are your strongest matches.", brief:"Top matches from {n} listings:" },
+  nomatch:{ standard:"I couldn't find a close match with all of those filters. Here are the nearest ones, with what doesn't fit marked.", friendly:"Hmm, nothing matched every filter, but here are the closest ones! I marked what doesn't fit.", professional:"No listings met every criterion. These are the closest matches, with differences marked.", brief:"No exact matches. Closest ones, mismatches marked:" },
+  end:{ standard:"That's everything that's left. Want to loosen a filter, or start over?", brief:"That's all. Loosen a filter or start over?" },
+  stretch:{ standard:"Here are some outside-the-box picks. They're in different fields but use skills you have.", friendly:"Here are some fun outside-the-box picks! Different fields, but they use skills you already have.", professional:"These roles are outside your selected fields but align with your skills.", brief:"Other fields that fit your skills:" },
+  failed:{ standard:"I couldn't load the job listings just now. That's a problem on my side, not a sign there are no jobs for you. Want me to try again?", brief:"Couldn't load listings (my problem, not yours). Try again?" },
+  done:{ standard:"Thanks for trying me! Your session code is {code}, in case the team asks for it.", friendly:"Thanks so much for trying me! Your session code is {code}, in case the team asks for it.", professional:"Thank you for using Lucy. Your session code is {code}.", brief:"Thanks! Session code: {code}." },
+  doneSurvey:{ standard:"Thanks for trying me! Could you take a 1-minute survey? It's separate from me, so please be honest. Your session code is {code}.", brief:"Thanks! 1-minute survey? Session code: {code}." },
+  resumeFound:{ standard:"From your résumé I picked up: {x}. Tap any that are wrong to remove them, then Done.", friendly:"Nice résumé! I picked up: {x}. Tap any that are wrong to remove them, then Done.", professional:"I identified these skills in your résumé: {x}. Select any that are incorrect to remove them.", brief:"Found: {x}. Tap wrong ones to remove." },
+  resumeSave:{ standard:"Want me to keep your résumé on this device so you don't have to upload it again? It never goes to the research log.", professional:"Would you like your résumé stored on this device for future visits? It is never sent to the research log.", brief:"Keep résumé on this device? (never sent to research)" },
+  edit:{ standard:"What should I change?", brief:"Change what?" },
+  notforme:{ standard:"Thanks, I'll hide that one. What was off about it?", friendly:"Got it, I'll hide that one! What was off about it?", professional:"Understood. I've removed it. What didn't fit?", brief:"Hidden. What was off?" },
+  restartQ:{ standard:"Start over? Your answers in this chat will be cleared.", brief:"Start over? This clears this chat." },
+  resumed:{ standard:"Welcome back! I kept your place.", brief:"Picking up where you left off." }
+};
+const EXP_Q = { standard:"What did you do in your {x}? Pick any or type your own.", friendly:"Tell me about your {x}! What did you do there? Pick any or type your own.", professional:"What were your responsibilities in your {x}? Select any or type your own.", brief:"Your {x}: what did you do?" };
+function T(key, vars = {}){
+  const set = key === "exp" ? EXP_Q : V[key];
+  let s = (set && (set[PREFS.tone] || set.standard)) || key;
+  for (const [k, v] of Object.entries(vars)) s = s.split("{" + k + "}").join(v);
+  return s;
+}
+const TONE_AI = { standard:"clear and friendly", friendly:"warm, upbeat and encouraging", professional:"polished and professional", brief:"extremely brief" };
+
+/* ===== privacy helpers ===== */
+const DEMO = /\b(gender|pronouns?|he\/him|she\/her|they\/them|race|racial|ethnicity|ethnic|nationality|religion|religious|date of birth|d\.?o\.?b\.?|birth ?date|age\s*:|marital|disability|disabled|veteran status|sexual orientation)\b/i;
+function scrub(text){
+  return String(text || "")
+    .replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, "[email]")
+    .replace(/(\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/g, "[phone]")
+    .replace(/https?:\/\/\S+|www\.\S+|(linkedin|github)\.com\/\S+/gi, "[link]");
+}
+function redactResume(text){
+  let t = scrub(text).replace(/\b\d{1,5}\s+(\w+\s){0,3}(street|st|avenue|ave|road|rd|drive|dr|lane|ln|blvd|court|ct|way)\b\.?/gi, "[address]");
+  const lines = t.split(/\n/);
+  const i = lines.findIndex(l => l.trim());
+  if (i >= 0 && /^[A-Z][a-zA-Z'’-]+(\s+[A-Z][a-zA-Z'’.-]+){1,3}$/.test(lines[i].trim())) lines[i] = "[name]";
+  return lines.filter(l => !DEMO.test(l)).join("\n");
+}
+
+/* ===== vocabulary ===== */
+const SKILL_WORDS = ["excel","sql","python","tableau","power bi","javascript","java","c++","html","css","react","figma","adobe","photoshop","illustrator","canva","writing","editing","social media","seo","google analytics","salesforce","hubspot","crm","customer service","sales","research","data analysis","statistics","public speaking","presentation","project management","marketing","communication","leadership","spanish","accounting","quickbooks","financial modeling","powerpoint","microsoft office","git","aws","linux","networking","cybersecurity","ux","ui","wordpress","video editing","photography","lab","clinical","teaching","tutoring","event planning","scheduling","budgeting","copywriting","content","analytics","machine learning"];
+const FIELD_KEYS = {
+  "Business":["business","operations","sales","consult","finance","account","strategy","development"],
+  "Marketing":["marketing","brand","social","content","growth","campaign","seo"],
+  "Communications":["communications","public relations"," pr ","content","writer","editor","editorial","media","journalis"],
+  "Computer Science":["software","engineer","developer","it ","support","security","data","qa","technical"],
+  "Data / Statistics":["data","analyst","analytics","statist","insight"],
+  "Psychology":["research","people","recruit","human resources","hr ","user research","behavior","talent"],
+  "Biology / Health":["health","clinical","lab","research","patient","science","bio","medical"],
+  "Engineering":["engineer","manufactur","quality","mechanical","electrical","hardware","technical"],
+  "Design / Art":["design","ux","ui","graphic","creative","brand","visual"],
+  "Education":["education","teach","tutor","learning","program","curriculum","student"],
+  "Finance":["finance","financial","account","investment","bank","audit","tax"],
+  "Accounting":["account","audit","tax","finance"],
+  "Economics":["econom","analyst","finance","policy","research"],
+  "Political Science":["policy","government","public","advocacy","political"],
+  "Nursing / Pre-med":["health","clinical","patient","medical","care"],
+  "Journalism":["editor","editorial","writer","media","journalis","content"],
+  "Information Systems":["data","it ","systems","analyst","software","technical","security"],
+  "Hospitality":["event","hospitality","guest","travel"],
+  "Supply Chain":["supply","logistics","operations","procurement"],
+  "Government":["government","policy","public"],
+  "Media & entertainment":["media","entertainment","editorial","content","video"],
+  "Logistics & supply chain":["logistics","supply","operations"],
+  "Events & hospitality":["event","hospitality","travel"],
+  "Startups":["startup","founder","growth"],
+  "Tech":["software","engineer","data","product","it ","technical","developer","security"],
+  "Marketing & media":["marketing","media","content","social","brand","communications","public relations","writer","editorial"],
+  "Healthcare":["health","clinical","patient","medical","care","pharma"],
+  "Nonprofit & policy":["nonprofit","policy","program","community","advocacy","public","government"],
+  "Science & research":["research","science","lab","scientist","study"],
+  "Sales & business":["sales","business","account","customer","operations","consult"],
+  "Sustainability":["sustainab","climate","energy","environment","solar"],
+  "Design":["design","ux","ui","graphic","creative"]
+};
+
+/* ===== questions ===== */
+const EXP_OPTS = ["Internship","Part-time job","Research","Class projects","Club leadership","Volunteering","Not much yet"];
+const Q = [
+  { id:"type", opts:["Full-time","Internship","Part-time","Contract","Open to any"], multi:true,
+    apply:(v)=>P.types = v.includes("Open to any") ? [] : v.filter(x=>["Full-time","Internship","Part-time","Contract"].includes(x)) },
+  { id:"stage", opts:["Freshman or sophomore","Junior","Graduating this year","Recent grad","Grad student","1–2 years of work","Switching careers"], multi:false,
+    apply:(v,t)=>P.stage = v[0] || t || null },
+  { id:"major", opts:["Business","Marketing","Communications","Journalism","Computer Science","Information Systems","Data / Statistics","Economics","Finance","Accounting","Political Science","Psychology","Biology / Health","Nursing / Pre-med","Engineering","Design / Art","Education","Hospitality","Supply Chain","Undecided"], multi:true, free:true,
+    apply:(v,t)=>{ P.major = v; if (t) P.keywords.push(...splitList(t).map(lc)); } },
+  { id:"skills", opts:["Excel","SQL","Python","Tableau","Data analysis","Writing","Editing","Social media","Canva","Figma / Adobe","Video editing","PowerPoint","Public speaking","Customer service","Sales","Salesforce","Accounting","Research","Project management","Event planning","Leadership","Spanish"], multi:true, free:true, resume:true,
+    apply:(v,t)=>{ P.skills = uniq([...P.skills, ...v.map(normSkill), ...splitList(t).map(lc)]); } },
+  { id:"exp", opts:EXP_OPTS, multi:true,
+    apply:(v)=>{ P.experience = v; S.queue = hasResume() ? [] : v.filter(x => x !== "Not much yet"); } },
+  { id:"interests", opts:["Tech","Marketing & media","Media & entertainment","Finance","Healthcare","Education","Nonprofit & policy","Government","Design","Science & research","Sales & business","Startups","Logistics & supply chain","Events & hospitality","Sustainability","Open to anything"], multi:true, free:true,
+    apply:(v,t)=>{ P.interests = v; if (t) P.keywords.push(...splitList(t).map(lc)); } },
+  { id:"style", opts:["Remote","Hybrid","On-site"], multi:true,
+    apply:(v)=>P.workStyle = v },
+  { id:"where", opts:["Atlanta, GA","Athens, GA","New York, NY","Washington, DC","Boston, MA","Chicago, IL","San Francisco, CA","Los Angeles, CA","Remote only","Anywhere in the US","Open to relocating"], multi:true, free:true,
+    when:()=>!(P.workStyle.length===1 && P.workStyle[0]==="Remote"),
+    apply:(v,t)=>{ P.anywhere = v.includes("Anywhere in the US"); P.relocate = v.includes("Open to relocating");
+      if (v.includes("Remote only")) P.workStyle = ["Remote"];
+      P.places = uniq([...v.filter(x=>!/Anywhere|relocat|Remote only/.test(x)), ...splitList(t)]); } },
+  { id:"pay", opts:["$35k+","$40k+","$50k+","$60k+","$75k+","$90k+","No minimum"], multi:false,
+    apply:(v,t)=>{ const m = /(\d{2,3})\s?k/i.exec(v[0]||t||"") || /(\d{2,3}),?000/.exec(t||""); P.minPay = m ? +m[1]*1000 : null; } },
+  { id:"start", opts:["Right away","Within 3 months","Spring 2027","Summer 2027","After graduation","Flexible"], multi:false,
+    apply:(v,t)=>P.start = v[0] || t || null },
+  { id:"visa", opts:["No","Yes","Not sure","Prefer not to say"], multi:false,
+    apply:(v,t)=>P.sponsor = v[0] === "Prefer not to say" ? null : (v[0] || (/^y/i.test(t) ? "Yes" : /^n/i.test(t) ? "No" : t) || null) }
+];
+Q.forEach(q => { q.skip = true; });
+const INTAKE_TOTAL = Q.length;
+const EXP_DETAIL = {
+  "Internship":["Marketing / social media","Data and reports","Software / IT","Sales / outreach","Operations / admin","Finance / accounting","Research","Design / content"],
+  "Part-time job":["Customer service","Retail / sales","Food service","Tutoring / teaching","Office / admin","Led a team","Handled money / budgets"],
+  "Research":["Lab work","Data analysis","Surveys / interviews","Literature review","Writing papers","Presented findings"],
+  "Class projects":["Data analysis","Built an app or website","Marketing plan","Business case","Design project","Research paper","Presentation"],
+  "Club leadership":["Event planning","Social media","Budget / treasurer","President / VP","Recruiting members","Fundraising"],
+  "Volunteering":["Community outreach","Tutoring kids","Event help","Fundraising","Healthcare / hospital","Social media"]
+};
+const DETAIL_SKILLS = { "Marketing / social media":["social media","marketing"], "Data and reports":["data analysis","excel"], "Software / IT":["software"], "Sales / outreach":["sales"], "Operations / admin":["operations","scheduling"], "Finance / accounting":["accounting","budgeting"], "Design / content":["content","design"],
+  "Customer service":["customer service"], "Retail / sales":["sales","customer service"], "Tutoring / teaching":["tutoring","teaching"], "Office / admin":["scheduling","microsoft office"], "Led a team":["leadership"], "Handled money / budgets":["budgeting"],
+  "Lab work":["lab"], "Data analysis":["data analysis"], "Surveys / interviews":["research"], "Literature review":["research","writing"], "Writing papers":["writing"], "Presented findings":["presentation","public speaking"],
+  "Built an app or website":["software","html"], "Marketing plan":["marketing"], "Business case":["research","presentation"], "Design project":["design"], "Research paper":["research","writing"], "Presentation":["presentation","public speaking"],
+  "Event planning":["event planning"], "Social media":["social media"], "Budget / treasurer":["budgeting","accounting"], "President / VP":["leadership"], "Recruiting members":["recruiting","communication"], "Fundraising":["fundraising","sales"],
+  "Community outreach":["communication","community"], "Tutoring kids":["tutoring"], "Event help":["event planning"], "Healthcare / hospital":["health","patient"] };
+function expQ(opt){
+  return { id:"exp:" + opt, opts:EXP_DETAIL[opt] || [], multi:true, skip:true, free:true, text:() => T("exp", { x: lc(opt) }),
+    apply:(v,t)=>{ const said = [...v, t].filter(Boolean).join(", ");
+      if (said){ P.notes.push(opt + ": " + scrub(said)); P.keywords.push(...v.flatMap(x => DETAIL_SKILLS[x] || []), ...extractSkills(t)); }
+      P.skills = uniq([...P.skills, ...v.flatMap(x => DETAIL_SKILLS[x] || []).filter(x => SKILL_WORDS.includes(x))]); } };
+}
+function qById(id){ return id && id.startsWith("exp:") ? expQ(id.slice(4)) : Q.find(q => q.id === id); }
+function qText(q){ return q.text ? q.text() : T("q_" + q.id); }
+
+/* ===== state ===== */
+let P, S, TR, SID;
+function newSID(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
+function freshP(){ return { types:[], stage:null, major:[], skills:[], resumeSkills:[], experience:[], interests:[], workStyle:[], places:[], anywhere:false, relocate:false, minPay:null, start:null, sponsor:null, keywords:[], notes:[], avoidFields:[], seniorPenalty:0 }; }
+function fresh(){
+  P = freshP();
+  S = { phase:"setup", qi:-1, queue:[], step:null, followups:[], fu:0, page:0, saved:[], applied:[], dismissed:[], busy:false };
+  TR = []; SID = newSID();
+}
+fresh();
+let JOBS = [], META = {};
+let consent = null;
+const CODE = () => SID.slice(0, 6).toUpperCase();
+const hasResume = () => P.resumeSkills.length > 0;
+
+/* ===== capabilities ===== */
+const cap = { db:null, user:null, sample:null, downloads:null, uid:null, owner:false, dbOK:false };
+const capReady = (async () => {
+  if (!window.claude || !window.claude.use) return;
+  const [db, user, sample, downloads] = await Promise.all(["db","user","sample","downloads"].map(n => window.claude.use(n).catch(()=>null)));
+  Object.assign(cap, { db, user, sample, downloads });
+  if (user) { try { cap.owner = await user.isOwner(); } catch {} try { cap.uid = await user.id(); } catch {} }
+  cap.dbOK = !!(db && cap.uid);
+  if (consent) flushLog();
+})();
+
+/* ===== interaction log ===== */
+let LOG = [], flushed = 0, writeChain = Promise.resolve(), userDocWritten = false, remoteQ = [], remoteTimer = null;
+function logEvent(kind, step, value){
+  LOG.push({ session:SID, t:new Date().toISOString(), kind, step:step || "", value:scrub(String(value ?? "")).slice(0, 600), tone:PREFS.tone });
+  if (consent === false) flushed = LOG.length;
+  if (consent) flushLog();
+  saveSession();
+}
+function flushLog(){
+  if (!consent) return;
+  if (cap.dbOK){
+    const pending = LOG.slice(flushed); flushed = LOG.length;
+    for (const e of pending) writeChain = writeChain.then(async () => {
+      try {
+        if (!userDocWritten){ userDocWritten = true; await cap.db.doc("logs/" + cap.uid).set({ lastSeen:e.t }); }
+        await cap.db.collection("logs/" + cap.uid + "/events").add(e);
+      } catch { cap.dbOK = false; }
+    });
+  } else if (LOG_ENDPOINT){
+    remoteQ.push(...LOG.slice(flushed)); flushed = LOG.length;
+    clearTimeout(remoteTimer); remoteTimer = setTimeout(sendRemote, 2000);
+  }
+}
+function sendRemote(){
+  if (!LOG_ENDPOINT || !remoteQ.length) return;
+  const body = JSON.stringify({ events: remoteQ.splice(0) });
+  try { fetch(LOG_ENDPOINT, { method:"POST", mode:"no-cors", keepalive:true, headers:{ "Content-Type":"text/plain;charset=utf-8" }, body }).catch(()=>{}); } catch {}
+}
+document.addEventListener("visibilitychange", () => { if (document.hidden) { sendRemote(); saveSession(); } });
+function toCSV(rows){
+  const cols = ["session","t","kind","step","value","tone"];
+  const esc = v => { v = String(v ?? ""); return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; };
+  return [["session_id","timestamp","event","question","value","tone"].join(","), ...rows.map(r => cols.map(c => esc(r[c])).join(","))].join("\n");
+}
+async function saveFile(name, text, msgEl){
+  if (cap.downloads){
+    try { await cap.downloads.save({ filename:name, data:text }); msgEl.textContent = "Saved."; }
+    catch (e) { msgEl.textContent = e && e.code === "declined" ? "Download canceled." : "Couldn't save the file here."; }
+    return;
+  }
+  if (window.claude){ msgEl.textContent = "Downloads aren't available in this view."; return; }
+  const a = h("a", { href:URL.createObjectURL(new Blob([text], { type:"text/csv" })), download:name });
+  document.body.append(a); a.click(); a.remove(); msgEl.textContent = "Saved.";
+}
+async function allLogs(){
+  const out = [];
+  const users = await cap.db.collection("logs").limit(1000).get();
+  for (const d of users.docs){
+    const ev = await cap.db.collection("logs/" + d.id + "/events").orderBy("t").limit(1000).get();
+    ev.docs.forEach(x => out.push(x.data()));
+  }
+  return out.sort((a, b) => a.t < b.t ? -1 : 1);
+}
+
+/* ===== device memory ===== */
+function saveProfile(){
+  if (!PREFS.remember) return;
+  const prof = LS.get("lucy.profile") || {};
+  prof.P = Object.assign({}, P, { resumeSkills: PREFS.saveResume ? P.resumeSkills : [] });
+  prof.saved = S.saved; prof.applied = S.applied; prof.updated = Date.now();
+  LS.set("lucy.profile", prof);
+}
+function saveResumeLocal(text, skills){ if (!PREFS.saveResume) return; LS.set("lucy.resume", { text, skills, saved:Date.now() }); }
+function deleteSaved(){ LS.del("lucy.profile"); LS.del("lucy.resume"); }
+
+/* keep place across reloads (incl. when a new version goes live) */
+function sessionData(){ return { v:2, P, S:Object.assign({}, S, { busy:false }), TR, SID, consent, LOG, flushed }; }
+function saveSession(){ SS.set("lucy.session", sessionData()); }
+if (window.claude && window.claude.hot && window.claude.hot.snapshot) { try { window.claude.hot.snapshot(() => ({ lucy: sessionData() })); } catch {} }
+
+/* ===== UI primitives ===== */
+const log = $("log");
+const stamp = () => new Date().toLocaleTimeString([], { hour:"numeric", minute:"2-digit" });
+let lastWho = null;
+function nameTag(){ log.append(h("div", { class:"name", "aria-hidden":"true" }, "Lucy")); }
+function addRow(who, content, opts = {}){
+  if (who === "bot" && lastWho !== "bot") nameTag();
+  lastWho = who;
+  const bubble = h("div", { class:"bubble" + (opts.wide ? " wide" : "") }, content);
+  const row = h("div", { class:"row " + (opts.instant ? "" : "in ") + who + (opts.wide ? " full" : "") },
+    h("span", { class:"sr" }, who === "bot" ? "Lucy says: " : "You said: "), bubble, opts.wide ? null : h("span", { class:"time", "aria-hidden":"true" }, opts.time || stamp()));
+  log.append(row);
+  scrollDown();
+  if (!opts.instant && opts.rec !== false){
+    if (typeof content === "string") TR.push({ w:who, t:content, at:stamp() });
+    else if (opts.rec) TR.push(opts.rec);
+    saveSession();
+  }
+  return row;
+}
+function scrollDown(){ requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; }); }
+function delayFor(text){
+  const n = typeof text === "string" ? text.length : 140;
+  return PREFS.fast ? 300 : Math.max(850, Math.min(2000, 600 + n * 13));
+}
+async function say(content, opts = {}){
+  S.busy = true; setBusy(true);
+  const dots = h("div", { class:"row bot", "aria-hidden":"true" }, h("div", { class:"bubble typing" }, h("i"), h("i"), h("i")));
+  if (lastWho !== "bot"){ nameTag(); lastWho = "bot"; }
+  log.append(dots); scrollDown();
+  $("status").textContent = "Lucy is typing";
+  await sleep(opts.delay ?? delayFor(content));
+  dots.remove(); $("status").textContent = "";
+  lastWho = "bot";
+  const row = addRow("bot", content, opts);
+  if (typeof content === "string") logEvent("lucy", S.step ? S.step.id || S.step.k : S.phase, content);
+  S.busy = false; setBusy(false);
+  return row;
+}
+function you(text){ addRow("user", text); }
+function setBusy(b){ $("bSend").disabled = b; document.querySelectorAll("#suggest button").forEach(x => x.disabled = b); }
+function setProgress(){
+  const done = Math.max(0, S.qi);
+  const pct = S.phase === "intake" ? Math.round(done / INTAKE_TOTAL * 100) : (S.phase === "results" || S.phase === "followup") ? 100 : 0;
+  $("bar").style.width = pct + "%";
+  $("sub").textContent = S.phase === "intake" ? "Automated job-search assistant · question " + Math.min(done + 1, INTAKE_TOTAL) + " of " + INTAKE_TOTAL
+    : S.phase === "results" ? "Automated job-search assistant · " + JOBS.length + " live listings" : "Automated job-search assistant";
+}
+
+/* suggestions; every call names its step so a reload can put the chips back */
+let SUG = null;
+function suggest(step, cfg){
+  S.step = step; SUG = cfg; saveSession();
+  const box = $("suggest"); box.replaceChildren(); box.hidden = false;
+  const chips = h("div", { class:"chips", role:"group", "aria-labelledby":"sugLegend" });
+  const fs = h("fieldset", {}, h("legend", { id:"sugLegend" }, cfg.legend || "Suggested replies"), chips);
+  (cfg.opts || []).forEach(o => {
+    const b = h("button", { type:"button", class:"chip", "aria-pressed": cfg.multi ? "false" : null,
+      onclick:() => { if (S.busy) return;
+        if (cfg.multi){ b.setAttribute("aria-pressed", b.getAttribute("aria-pressed") === "true" ? "false" : "true"); updateDone(); }
+        else commit([o], ""); } }, o);
+    chips.append(b);
+  });
+  (cfg.extra || []).forEach(x => chips.append(h("button", { type:"button", class:"chip ghost", onclick:() => { if (!S.busy) x.fn(); } }, x.label)));
+  const act = h("div", { class:"sact" });
+  if (cfg.multi) act.append(h("span", { class:"hint", id:"selHint" }, "Pick any that fit"));
+  if (cfg.skip) act.append(h("button", { type:"button", class:"chip ghost", onclick:() => { if (!S.busy) commit([], "", true); } }, "Skip"));
+  if (cfg.multi) act.append(h("button", { type:"button", class:"chip solid", id:"doneBtn", disabled:true, onclick:() => { if (!S.busy) commit(selected(), $("msg").value.trim()); } }, cfg.doneLabel || "Done"));
+  if (act.childNodes.length) fs.append(act);
+  box.append(fs);
+  setBusy(S.busy);
+  scrollDown();
+}
+const selected = () => [...document.querySelectorAll('#suggest .chip[aria-pressed="true"]')].map(b => b.textContent);
+function updateDone(){
+  const n = selected().length, d = $("doneBtn"), base = (SUG && SUG.doneLabel) || "Done";
+  if (d){ d.disabled = n === 0 && !$("msg").value.trim(); d.textContent = n ? base + " (" + n + ")" : base; }
+  const hn = $("selHint"); if (hn) hn.textContent = n ? n + " selected" : "Pick any that fit";
+}
+function clearSuggest(){ SUG = null; $("suggest").hidden = true; $("suggest").replaceChildren(); }
+function commit(values, text, skipped){
+  const cfg = SUG; if (!cfg) return;
+  clearSuggest(); $("msg").value = "";
+  const shown = skipped ? "Skip" : [...values, text].filter(Boolean).join(", ");
+  if (shown) you(shown);
+  cfg.onPick(values, text, !!skipped);
+}
+
+/* ===== flow ===== */
+async function start(){
+  log.replaceChildren(); lastWho = null; clearSuggest();
+  fresh(); consent = null; LOG = []; flushed = 0; userDocWritten = false; SS.del("lucy.session");
+  setProgress();
+  log.append(h("div", { class:"day" }, new Date().toLocaleDateString([], { month:"long", day:"numeric", year:"numeric" })));
+  if (!PREFS.setupDone) await openSetup();
+  S.phase = "consent";
+  await say(T("greet1"));
+  await say(T("greet2"));
+  askConsent();
+}
+async function askConsent(){
+  await say(T("consent"));
+  stepConsent();
+}
+function stepConsent(){
+  suggest({ k:"consent" }, { legend:"Use your answers to improve Lucy?", opts:["Yes, I consent","No, keep it private"], multi:false,
+    onPick: async (v, t) => {
+      consent = /^(yes|y|sure|ok|okay|i consent)\b/i.test(v[0] || t || "");
+      $("tResearch").checked = consent;
+      logEvent("consent", "consent", consent ? "yes" : "no");
+      await say(consent ? T("consentYes") : T("consentNo"), { delay: PREFS.fast ? 300 : 900 });
+      const prof = LS.get("lucy.profile");
+      if (PREFS.remember && prof && prof.P) return askWelcome(prof);
+      await say(T("remember")); stepRemember();
+    } });
+}
+function stepRemember(){
+  suggest({ k:"remember" }, { legend:"Remember on this device?", opts:["Yes, remember","No thanks"], multi:false,
+    onPick: async (v) => {
+      PREFS.remember = v[0].startsWith("Yes"); savePrefs(); $("tRemember").checked = PREFS.remember;
+      if (!PREFS.remember) deleteSaved();
+      logEvent("remember", "remember", PREFS.remember ? "yes" : "no");
+      await say(PREFS.remember ? T("rememberYes") : T("rememberNo"), { delay: PREFS.fast ? 300 : 900 });
+      S.phase = "intake"; nextQuestion();
+    } });
+}
+async function askWelcome(prof){
+  await say(T("welcome"));
+  stepWelcome();
+}
+function stepWelcome(){
+  suggest({ k:"welcome" }, { legend:"Use saved answers?", opts:["Use my saved answers","Start fresh","Delete my saved data"], multi:false,
+    onPick: async (v) => {
+      const prof = LS.get("lucy.profile") || {};
+      logEvent("welcome", "welcome", v[0]);
+      if (v[0] === "Use my saved answers" && prof.P){
+        P = Object.assign(freshP(), prof.P);
+        const r = PREFS.saveResume && LS.get("lucy.resume"); if (r && r.skills) P.resumeSkills = uniq([...P.resumeSkills, ...r.skills]);
+        S.saved = prof.saved || []; S.applied = prof.applied || [];
+        S.qi = Q.length; return runSearch();
+      }
+      if (v[0] === "Delete my saved data"){ deleteSaved(); PREFS.remember = false; savePrefs(); $("tRemember").checked = false; await say("Done. Your saved data is deleted from this device."); }
+      else { S.saved = prof.saved || []; S.applied = prof.applied || []; }
+      S.phase = "intake"; nextQuestion();
+    } });
+}
+async function nextQuestion(){
+  S.phase = "intake";
+  let q;
+  if (S.queue.length){ q = expQ(S.queue.shift()); }
+  else {
+    S.qi++;
+    while (S.qi < Q.length && Q[S.qi].when && !Q[S.qi].when()) S.qi++;
+    setProgress();
+    if (S.qi >= Q.length) return followups();
+    q = Q[S.qi];
+  }
+  await say(qText(q));
+  stepQuestion(q);
+}
+function stepQuestion(q){
+  const extra = [];
+  if (q.resume) extra.push({ label: hasResume() ? "Résumé added" : "Attach résumé", fn:() => $("file").click() });
+  if (S.qi >= 3) extra.push({ label:"Show me jobs now", fn:() => { you("Show me jobs now"); logEvent("jump","results", q.id); clearSuggest(); S.queue = []; followups(true); } });
+  suggest({ k:"q", id:q.id }, { legend:qText(q), opts:q.opts, multi:q.multi, skip:q.skip, extra, onPick:(v, t, sk) => answer(q, v, t, sk) });
+  if (!q.opts.length) $("msg").focus();
+}
+async function answer(q, v, t, skipped){
+  if (!skipped) q.apply(v, t || "");
+  logEvent(skipped ? "skip" : "answer", q.id, skipped ? "" : [...v, t].filter(Boolean).join(" | "));
+  saveProfile();
+  if (!skipped && t && (q.id === "major" || q.id === "interests")) await say(T("ack", { x: t.slice(0, 60) }));
+  if (S.phase === "edit"){ S.queue = []; S.phase = "results"; setProgress(); return runSearch("Updated. Here's the new list."); }
+  nextQuestion();
+}
+async function followups(jumped){
+  S.phase = "followup"; setProgress();
+  if (!jumped && cap.sample){
+    let qs = [];
+    try {
+      const prompt = "You help a college student find entry-level jobs. Here is what they've told a job-search chatbot:\n" + JSON.stringify(profileSummary()) +
+        "\n\nWrite up to 2 short follow-up questions (max 80 characters each) about the most important missing or vague details that would change which jobs fit them, such as specific tools, the kind of tasks they enjoy, or a target city. Use a " + TONE_AI[PREFS.tone] + " tone. Do not repeat questions already answered. Never ask about or consider name, age, race, ethnicity, gender, religion, disability, health, family, GPA, or immigration status. For each give 3-6 short answer options (max 4 words each)." +
+        '\nReply with only JSON like {"questions":[{"text":"...","options":["..."],"multi":true}]}. Return {"questions":[]} if nothing important is missing.';
+      const res = await withTimeout(cap.sample.json(prompt, { modelTier:"quick" }), 15000);
+      qs = (res && Array.isArray(res.questions) ? res.questions : []).filter(x => x && typeof x.text === "string").slice(0, 2);
+    } catch (e) { logEvent("ai_error","followup", e && e.code || "timeout"); }
+    S.followups = qs.map(x => ({ text:x.text.slice(0,120), options:(Array.isArray(x.options) ? x.options : []).map(String).slice(0,6), multi:x.multi !== false }));
+    S.fu = 0;
+  }
+  askFollowup();
+}
+async function askFollowup(){
+  const f = S.followups[S.fu];
+  if (!f){ S.phase = "results"; setProgress(); return runSearch(); }
+  await say(f.text);
+  stepFollowup();
+}
+function stepFollowup(){
+  const f = S.followups[S.fu]; if (!f) return runSearch();
+  suggest({ k:"fu" }, { legend:f.text, opts:f.options, multi:f.multi, skip:true,
+    onPick:(v, t, skipped) => {
+      if (!skipped){ const words = [...v, t].filter(Boolean); P.notes.push(f.text + " " + words.join(", ")); P.keywords.push(...words.flatMap(w => [lc(w), ...extractSkills(w)])); saveProfile(); }
+      logEvent(skipped ? "skip" : "answer", "ai:" + f.text, [...v, t].filter(Boolean).join(" | "));
+      S.fu++; askFollowup();
+    } });
+}
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_, r) => setTimeout(() => r({ code:"timeout" }), ms))]);
+
+/* ===== matching (uses only job-related answers) ===== */
+function profileSummary(){
+  return { jobTypes:P.types, stage:P.stage, majors:P.major, skills:uniq([...P.skills, ...P.resumeSkills]), experience:P.experience, interests:P.interests,
+    workStyle:P.workStyle, places:P.places, anywhereInUS:P.anywhere, openToRelocating:P.relocate, minSalary:P.minPay, start:P.start, needsSponsorship:P.sponsor, notes:P.notes.slice(-4), extraKeywords:uniq(P.keywords).slice(0,20) };
+}
+const jobText = j => lc([j.title, j.field, j.summary, (j.skills||[]).join(" "), j.company].join(" "));
+const isRemote = j => j.workStyle === "Remote" || /remote/i.test(j.location);
+const jobByUrl = u => JOBS.find(j => j.url === u);
+function hasProfile(){ return !!(P.types.length || P.major.length || P.skills.length || P.resumeSkills.length || P.interests.length || P.workStyle.length || P.places.length || P.minPay || P.keywords.length || P.sponsor === "Yes"); }
+function score(j){
+  const t = jobText(j), why = [], warn = [];
+  let s = 0;
+  if (P.types.length){ if (P.types.includes(j.type)) { s += 3; why.push(j.type); } else { s -= 4; warn.push(j.type + " role"); } }
+  if (j.type === "Internship" && P.stage === "1–2 years of work") s -= 2;
+  if (/Early/.test(j.level || "")){ if (P.stage === "1–2 years of work") s += 1; else if (!P.experience.length || P.experience.includes("Not much yet")){ s -= 1; warn.push("Asks for 1–2 years"); } }
+  s -= P.seniorPenalty * (/Early/.test(j.level || "") ? 2 : 0);
+  const skills = uniq([...P.skills, ...P.resumeSkills].map(lc)).filter(x => x.length > 1);
+  const hit = skills.filter(k => (j.skills||[]).some(js => lc(js).includes(k) || k.includes(lc(js))) || new RegExp("\\b" + k.replace(/[.*+?^${}()|[\]\\]/g,"\\$&") + "\\b").test(t));
+  s += Math.min(hit.length, 4) * 2;
+  if (hit.length) why.push("Uses " + hit.slice(0,3).join(", "));
+  const areas = [...P.major, ...P.interests].filter(a => FIELD_KEYS[a]);
+  const ft = " " + lc(j.title + " " + j.field) + " ";
+  const fieldHit = areas.find(a => FIELD_KEYS[a].some(k => ft.includes(k)));
+  if (fieldHit){ s += 3; why.push("Fits " + fieldHit.replace(" / ", "/")); }
+  else if (areas.length && !P.interests.includes("Open to anything")) s -= 4;
+  const kw = uniq(P.keywords).filter(k => k.length > 2 && t.includes(k));
+  s += Math.min(kw.length, 3);
+  if (kw.length && !hit.length) why.push("Mentions " + kw.slice(0,2).join(", "));
+  if (P.avoidFields.includes(lc(j.field))) s -= 5;
+  if (P.workStyle.length && j.workStyle && j.workStyle !== "Unknown"){
+    if (P.workStyle.includes(j.workStyle)){ s += 2; why.push(j.workStyle); } else { s -= 3; warn.push(j.workStyle); }
+  }
+  if (isRemote(j)){ if (!P.workStyle.length || P.workStyle.includes("Remote")) s += 1; }
+  else if (P.places.length){
+    const near = P.places.find(c => { const city = lc(c.split(",")[0]); return city && lc(j.location).includes(city); });
+    if (near){ s += 3; why.push("In " + near.split(",")[0]); }
+    else if (!P.anywhere && !P.relocate){ s -= 7; warn.push("Based in " + j.location); }
+  }
+  if (P.minPay){
+    if (j.salaryMax != null){ if (j.salaryMax >= P.minPay){ s += 2; why.push("Meets your pay"); } else { s -= 3; warn.push("Below your pay minimum"); } }
+    else warn.push("Pay not listed");
+  }
+  if (P.sponsor === "Yes"){
+    if (j.sponsorship === "Offered"){ s += 2; why.push("Sponsorship offered"); }
+    else if (j.sponsorship === "Not offered"){ s -= 6; warn.push("No visa sponsorship"); }
+    else warn.push("Sponsorship not stated");
+  }
+  return { s, why, warn, fieldHit:!!fieldHit, skillHit:hit.length };
+}
+const rank = () => JOBS.filter(j => !S.dismissed.includes(j.url)).map(j => ({ j, ...score(j) })).sort((a, b) => b.s - a.s);
+const money = n => "$" + Math.round(n/1000) + "k";
+function payText(j){
+  if (j.salaryMin != null && j.salaryMax != null && j.salaryMin !== j.salaryMax) return money(j.salaryMin) + "–" + money(j.salaryMax);
+  if (j.salaryMax != null || j.salaryMin != null) return money(j.salaryMax ?? j.salaryMin);
+  return "Pay not listed";
+}
+function fitLabel(s){ if (!hasProfile()) return "Open search"; return s >= 9 ? "Strong fit" : s >= 5 ? "Good fit" : s >= 2 ? "Worth a look" : "Stretch"; }
+function toggleList(list, url){ const i = list.indexOf(url); if (i >= 0) list.splice(i, 1); else list.push(url); return i < 0; }
+function refreshCards(url){
+  document.querySelectorAll('.job[data-url="' + CSS.escape(url) + '"]').forEach(card => {
+    const r = Object.assign({ j:jobByUrl(url) }, score(jobByUrl(url)));
+    card.replaceWith(jobCard(r));
+  });
+}
+function jobCard(r){
+  const j = r.j, isSaved = S.saved.includes(j.url), isApplied = S.applied.includes(j.url);
+  const save = h("button", { type:"button", "aria-pressed": isSaved ? "true" : "false", onclick:() => {
+    const on = toggleList(S.saved, j.url); logEvent(on ? "save" : "unsave", "job", j.company + " — " + j.title); saveProfile(); saveSession(); refreshCards(j.url); if (!$("board").hidden) renderBoard(); } }, isSaved ? "Saved" : "Save");
+  const applied = h("button", { type:"button", class:"applied", "aria-pressed": isApplied ? "true" : "false", onclick:() => {
+    const on = toggleList(S.applied, j.url); logEvent(on ? "applied" : "unapplied", "job", j.company + " — " + j.title); saveProfile(); saveSession(); refreshCards(j.url); if (!$("board").hidden) renderBoard(); } }, isApplied ? "Applied ✓" : "Mark applied");
+  const no = h("button", { type:"button", onclick:() => { closeBoard(); notForMe(r); } }, "Not for me");
+  const ts = tsOf(j);
+  return h("article", { class:"job" + (isApplied ? " applied" : ""), "data-url":j.url, "aria-label": j.title + " at " + j.company },
+    h("div", { class:"jtop" }, h("div", { class:"pills" }, h("span", { class:"fit" }, fitLabel(r.s)), isApplied ? h("span", { class:"fit done" }, "Applied") : null),
+      ts ? h("time", { class:"age", datetime:ts.toISOString(), "data-url":j.url, title:ts.toLocaleString() }, h("span", { class:"clock", "aria-hidden":"true" }), ageText(j)) : null),
+    h("h3", {}, j.title),
+    h("div", { class:"meta" }, h("span", {}, j.company), h("span", {}, j.location), h("span", {}, [j.workStyle !== "Unknown" ? j.workStyle : null, j.type].filter(Boolean).join(" · ")), h("span", {}, payText(j))),
+    j.summary ? h("p", { class:"sum" }, j.summary) : null,
+    (r.why.length || r.warn.length) ? h("div", { class:"tags", "aria-label":"Why this matched" },
+      r.why.map(w => h("span", { class:"tag ok" }, h("span", { class:"sr" }, "Match: "), w)),
+      r.warn.map(w => h("span", { class:"tag warn" }, h("span", { class:"sr" }, "Heads up: "), w))) : null,
+    h("div", { class:"jact" },
+      h("a", { href:j.url, target:"_blank", rel:"noopener noreferrer", onclick:() => logEvent("open_posting","job", j.company + " — " + j.title) }, "View posting ↗"),
+      save, applied, no, h("span", { class:"src" }, "via " + (j.source || "job board")))
+  );
+}
+const EXPAND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>';
+function resultsBubble(list){
+  const btn = h("button", { type:"button", class:"openall", onclick:() => openBoard("all") });
+  btn.innerHTML = EXPAND; btn.append("See all in full screen");
+  return h("div", { class:"results" }, list.map(jobCard), btn);
+}
+async function showJobs(list, delay){
+  await say(resultsBubble(list), { wide:true, delay, rec:{ w:"jobs", u:list.map(r => r.j.url) } });
+}
+async function runSearch(lead){
+  S.phase = "results"; setProgress();
+  if (!JOBS.length) return searchFailed();
+  S.page = 0;
+  const ranked = rank();
+  logEvent("search", "results", JSON.stringify(profileSummary()).slice(0, 600));
+  await say(lead || (ranked.some(r => r.s >= 2) ? T("results", { n:JOBS.length }) : T("nomatch")));
+  await showPage(true);
+}
+async function showPage(first){
+  const ranked = rank();
+  const list = ranked.slice(S.page * 4, S.page * 4 + 4);
+  S.page++;
+  if (!list.length){ await say(T("end")); return resultChips(); }
+  list.forEach(r => logEvent("shown","job", r.j.company + " — " + r.j.title + " (score " + r.s + ")"));
+  await showJobs(list, PREFS.fast ? 300 : 1200);
+  const fr = freshInfo();
+  if (fr && first) addRow("bot", h("span", { class:"note" }, "Listings last refreshed " + fr.rel + ". Fit is based only on what you told me; read each posting's requirements."), { rec:{ w:"note", t:"Listings last refreshed " + fr.rel + ". Fit is based only on what you told me; read each posting's requirements." } });
+  resultChips();
+}
+async function stretch(){
+  const ranked = rank();
+  const picks = ranked.filter(r => !r.fieldHit && r.skillHit > 0).slice(0, 4);
+  const alt = picks.length ? picks : ranked.filter(r => !r.fieldHit).slice(0, 4);
+  logEvent("stretch","results", alt.length);
+  if (!alt.length){ await say("I don't have any outside-the-box picks right now."); return resultChips(); }
+  await say(T("stretch"));
+  await showJobs(alt, PREFS.fast ? 300 : 1100);
+  resultChips();
+}
+function resultChips(){
+  suggest({ k:"results" }, { legend:"What next?", multi:false, opts:["Show more","Full-screen list","Outside-the-box picks","Only internships","Only full-time","Only remote","Pay $50k+","Change my answers","Saved & applied","I'm done"],
+    onPick:(v) => {
+      const c = v[0]; logEvent("action","results", c);
+      if (c === "Show more") showPage();
+      else if (c === "Full-screen list"){ openBoard("all"); resultChips(); }
+      else if (c === "Outside-the-box picks") stretch();
+      else if (c === "Only remote"){ P.workStyle = ["Remote"]; saveProfile(); runSearch("Remote only. Here's the updated list."); }
+      else if (c === "Only internships"){ P.types = ["Internship"]; saveProfile(); runSearch("Internships only. Here's the updated list."); }
+      else if (c === "Only full-time"){ P.types = ["Full-time"]; saveProfile(); runSearch("Full-time only. Here's the updated list."); }
+      else if (c === "Pay $50k+"){ P.minPay = 50000; saveProfile(); runSearch("Showing jobs that pay $50k or more first."); }
+      else if (c === "Change my answers") editMenu();
+      else if (c === "Saved & applied"){ openBoard(S.saved.length || !S.applied.length ? "saved" : "applied"); resultChips(); }
+      else finish();
+    } });
+}
+async function finish(){
+  logEvent("done","results", S.saved.length + " saved, " + S.applied.length + " applied");
+  if (SURVEY_URL) await say(h("span", {}, T("doneSurvey", { code:CODE() }) + " ",
+    h("a", { href:SURVEY_URL, target:"_blank", rel:"noopener noreferrer", onclick:() => logEvent("survey_open","results", CODE()) }, "Open the survey ↗")), { rec:{ w:"bot", t:T("doneSurvey", { code:CODE() }) } });
+  else await say(T("done", { code:CODE() }));
+  stepDone();
+}
+function stepDone(){ suggest({ k:"done" }, { legend:"Anything else?", multi:false, opts:["Back to my jobs","See saved & applied","Start over"], onPick:(v) => { logEvent("action","done", v[0]); if (v[0] === "Start over") return start(); if (v[0] === "See saved & applied") openBoard("saved"); resultChips(); } }); }
+async function editMenu(){
+  await say(T("edit"));
+  stepEdit();
+}
+const EDIT_MAP = { "Job type":"type", "Skills":"skills", "Experience":"exp", "Interests":"interests", "Work style":"style", "Location":"where", "Pay":"pay", "Sponsorship":"visa" };
+function stepEdit(){
+  suggest({ k:"edit" }, { legend:"Change which answer?", multi:false, opts:Object.keys(EDIT_MAP),
+    onPick: async (v) => {
+      const q = qById(EDIT_MAP[v[0]]);
+      if (q.id === "skills") P.skills = [];
+      if (q.id === "exp") S.queue = [];
+      S.phase = "edit";
+      await say(qText(q));
+      stepQuestion(q);
+    } });
+}
+async function notForMe(r){
+  if (!S.dismissed.includes(r.j.url)) S.dismissed.push(r.j.url);
+  logEvent("not_for_me","job", r.j.company + " — " + r.j.title);
+  document.querySelectorAll('.job[data-url="' + CSS.escape(r.j.url) + '"]').forEach(c => c.remove());
+  await say(T("notforme"));
+  stepNotForMe(r.j.url);
+}
+function stepNotForMe(url){
+  const j = jobByUrl(url) || {};
+  suggest({ k:"nfm", url }, { legend:"What was off?", multi:true, skip:true, opts:["Wrong field","Too senior","Location","Pay","Job type","Not into this company","Already applied"],
+    onPick:(v, t, sk) => {
+      logEvent("feedback","not_for_me", v.join(" | ") + (t ? " | " + t : ""));
+      if (v.includes("Wrong field")) P.avoidFields.push(lc(j.field));
+      if (v.includes("Too senior")) P.seniorPenalty++;
+      if (v.includes("Location") && !isRemote(j)){ P.anywhere = false; P.relocate = false; }
+      if (v.includes("Job type") && !P.types.length) P.types = ["Full-time","Internship","Part-time","Contract"].filter(x => x !== j.type);
+      if (v.includes("Pay") && !P.minPay && j.salaryMax) P.minPay = j.salaryMax + 1;
+      if (v.includes("Already applied") && !S.applied.includes(url)) S.applied.push(url);
+      saveProfile();
+      runSearch(sk || !v.length ? "Okay. Here's the list without it." : "Got it, I adjusted for that. Here's the updated list.");
+    } });
+}
+async function searchFailed(){
+  logEvent("error","search","listings unavailable");
+  await say(T("failed"));
+  stepFailed();
+}
+function stepFailed(){
+  suggest({ k:"failed" }, { legend:"Try again?", multi:false, opts:["Try again","Start over"], onPick: async (v) => {
+    if (v[0] === "Start over") return start();
+    await loadJobs(); runSearch();
+  } });
+}
+async function confirmRestart(){
+  const prev = S.step;
+  await say(T("restartQ"), { delay:400 });
+  suggest({ k:"restart", prev }, { legend:"Start over?", multi:false, opts:["Yes, start over","Keep going"], onPick:(v) => {
+    if (v[0].startsWith("Yes")){ logEvent("restart","",""); start(); } else resumeStep(prev);
+  } });
+}
+
+/* put the right chips back after a reload */
+function resumeStep(step){
+  if (!step) return S.phase === "results" ? resultChips() : nextQuestion();
+  switch (step.k){
+    case "consent": return stepConsent();
+    case "remember": return stepRemember();
+    case "welcome": return stepWelcome();
+    case "q": { const q = qById(step.id); return q ? stepQuestion(q) : nextQuestion(); }
+    case "fu": return stepFollowup();
+    case "edit": return stepEdit();
+    case "nfm": return stepNotForMe(step.url);
+    case "failed": return stepFailed();
+    case "done": return stepDone();
+    case "restart": return resumeStep(step.prev);
+    case "resume": return S.phase === "results" ? resultChips() : stepQuestion(qById("skills"));
+    case "resumeSave": return S.phase === "results" ? resultChips() : nextQuestion();
+    default: return resultChips();
+  }
+}
+function restore(st){
+  P = Object.assign(freshP(), st.P); S = Object.assign({ queue:[], saved:[], applied:[], dismissed:[] }, st.S, { busy:false });
+  TR = st.TR || []; SID = st.SID || newSID(); consent = st.consent ?? null; LOG = st.LOG || []; flushed = st.flushed || LOG.length;
+  log.replaceChildren(); lastWho = null;
+  log.append(h("div", { class:"day" }, new Date().toLocaleDateString([], { month:"long", day:"numeric", year:"numeric" })));
+  for (const it of TR){
+    if (it.w === "jobs"){ const list = (it.u || []).map(jobByUrl).filter(Boolean).filter(j => !S.dismissed.includes(j.url)).map(j => Object.assign({ j }, score(j))); if (list.length) addRow("bot", resultsBubble(list), { wide:true, instant:true }); }
+    else if (it.w === "note") addRow("bot", h("span", { class:"note" }, it.t), { instant:true });
+    else addRow(it.w, it.t, { instant:true, time:it.at });
+  }
+  setProgress();
+  if (consent) flushLog();
+  resumeStep(S.step);
+}
+
+/* ===== free text ===== */
+async function onFree(text){
+  if (SUG && S.phase !== "results"){
+    const cfg = SUG, sel = selected();
+    const picked = cfg.opts ? cfg.opts.filter(o => lc(o) === lc(text)) : [];
+    clearSuggest(); you([...sel, text].join(", "));
+    cfg.onPick(uniq([...sel, ...picked]), picked.length ? "" : text, false);
+    return;
+  }
+  you(text); clearSuggest();
+  logEvent("message", S.phase, text);
+  if (S.phase !== "results") return say("One moment, I'm still getting set up.");
+  const t = lc(text);
+  if (/^(more|show more|next)/.test(t)) return showPage();
+  if (/start over|restart|reset/.test(t)) return confirmRestart();
+  if (/full ?screen|see all|all jobs/.test(t)){ openBoard("all"); return resultChips(); }
+  if (/stretch|outside|different field/.test(t)) return stretch();
+  if (localParse(t)){ saveProfile(); return runSearch("Updated with that. Here's the new list."); }
+  if (cap.sample) return aiReply(text);
+  await say("I can narrow by job type, remote or hybrid, a city, a minimum salary, or a skill. Try something like “remote internships” or “Atlanta $55k”.");
+  resultChips();
+}
+function localParse(t){
+  let c = false;
+  const ws = []; if (/remote/.test(t)) ws.push("Remote"); if (/hybrid/.test(t)) ws.push("Hybrid"); if (/on-?site|in[- ]person|in office/.test(t)) ws.push("On-site");
+  if (ws.length){ P.workStyle = ws; c = true; }
+  const ty = []; if (/intern/.test(t)) ty.push("Internship"); if (/full[- ]?time/.test(t)) ty.push("Full-time"); if (/part[- ]?time/.test(t)) ty.push("Part-time"); if (/contract/.test(t)) ty.push("Contract");
+  if (ty.length){ P.types = ty; c = true; }
+  const m = /\$?\s?(\d{2,3})\s?k\b/.exec(t) || /\$\s?(\d{2,3}),?000/.exec(t);
+  if (m){ P.minPay = +m[1] * 1000; c = true; }
+  const cities = uniq(JOBS.map(j => j.location.split(",")[0].trim()).filter(x => x && !/remote/i.test(x)));
+  const city = cities.find(x => t.includes(lc(x)));
+  if (city){ P.places = [city]; P.anywhere = false; c = true; }
+  const sk = extractSkills(t).filter(x => !P.skills.includes(x));
+  if (sk.length){ P.skills.push(...sk); c = true; }
+  return c;
+}
+async function aiReply(text){
+  S.busy = true; setBusy(true);
+  const dots = h("div", { class:"row bot", "aria-hidden":"true" }, h("div", { class:"bubble typing" }, h("i"), h("i"), h("i")));
+  if (lastWho !== "bot"){ nameTag(); lastWho = "bot"; }
+  log.append(dots); scrollDown(); $("status").textContent = "Lucy is typing";
+  const prompt = "You are Lucy, an automated job-search assistant for college students. Use a " + TONE_AI[PREFS.tone] + " tone (max 2 sentences). Never claim to be human, never promise a job, never give legal or immigration advice. Never use, infer, or comment on the student's name, gender, race, ethnicity, age, religion, disability, or similar traits; base everything only on skills, interests, and stated job preferences.\n" +
+    "Student profile: " + JSON.stringify(profileSummary()) + "\nJob fields available: " + uniq(JOBS.map(j => j.field)).join(", ") +
+    "\nThe student just wrote: " + JSON.stringify(scrub(text).slice(0, 500)) +
+    '\nReply with only JSON: {"reply":"...","update":{"types":[],"workStyle":[],"places":[],"minPay":null,"addSkills":[],"addKeywords":[]},"search":true}. Use empty arrays/null for no change. types from Full-time, Internship, Part-time, Contract; workStyle from Remote, Hybrid, On-site. Set search true only if the update should change results.';
+  let res = null;
+  try { res = await withTimeout(cap.sample.json(prompt, { modelTier:"quick" }), 15000); } catch (e) { logEvent("ai_error","chat", e && e.code || "error"); }
+  await sleep(PREFS.fast ? 0 : 500);
+  dots.remove(); $("status").textContent = ""; S.busy = false; setBusy(false);
+  if (!res || typeof res.reply !== "string"){ addRow("bot", "I didn't catch that. I can filter by job type, remote, city, pay, or a skill."); return resultChips(); }
+  const u = res.update || {}, A = x => Array.isArray(x) ? x.map(String).filter(Boolean) : [];
+  if (A(u.types).length) P.types = A(u.types);
+  if (A(u.workStyle).length) P.workStyle = A(u.workStyle);
+  if (A(u.places).length){ P.places = A(u.places); P.anywhere = false; }
+  if (typeof u.minPay === "number" && u.minPay > 0) P.minPay = u.minPay;
+  P.skills.push(...A(u.addSkills).map(lc)); P.keywords.push(...A(u.addKeywords).map(lc));
+  saveProfile();
+  logEvent("ai_reply","chat", res.reply);
+  if (res.search) return runSearch(res.reply.slice(0, 300));
+  addRow("bot", res.reply.slice(0, 400)); resultChips();
+}
+
+/* ===== résumé ===== */
+function splitList(t){ return String(t || "").split(/,|;|\band\b|\n/).map(x => x.trim()).filter(Boolean); }
+function normSkill(s){ return lc(s).replace("figma / adobe","figma"); }
+function extractSkills(text){
+  const t = " " + lc(text).replace(/[^a-z0-9+#. ]/g," ") + " ";
+  return SKILL_WORDS.filter(w => t.includes(" " + w + " "));
+}
+function loadScript(src){ return new Promise((ok, no) => { if (document.querySelector('script[src="' + src + '"]')) return ok(); const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = no; document.head.append(s); }); }
+async function fileText(f){
+  const name = lc(f.name);
+  if (name.endsWith(".pdf")){
+    await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js");
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    const pdf = await window.pdfjsLib.getDocument({ data: await f.arrayBuffer() }).promise;
+    let out = "";
+    for (let i = 1; i <= Math.min(pdf.numPages, 6); i++){ const c = await (await pdf.getPage(i)).getTextContent(); out += c.items.map(x => x.str + (x.hasEOL ? "\n" : " ")).join("") + "\n"; }
+    return out;
+  }
+  if (name.endsWith(".docx")){
+    await loadScript("https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js");
+    return (await window.mammoth.extractRawText({ arrayBuffer: await f.arrayBuffer() })).value;
+  }
+  return await f.text();
+}
+async function onResume(f){
+  if (!f) return;
+  if (f.size > 8 * 1024 * 1024){ await say("That file is over 8 MB. Try a smaller PDF, Word, or text file."); return; }
+  const wasStep = S.step; clearSuggest();
+  you("Attached " + f.name);
+  logEvent("resume","upload", "attached (" + f.name.split(".").pop() + ")");
+  let raw = "";
+  try { raw = (await fileText(f)).slice(0, 20000); } catch { raw = ""; }
+  if (!raw.trim()){
+    await say("I couldn't read text from that file. If it's a scanned image, try a Word or text version, or just pick your skills.");
+    return resumeStep(wasStep);
+  }
+  const text = redactResume(raw);
+  await useResume(text, wasStep, true);
+}
+async function useResume(text, wasStep, fresh){
+  let found = extractSkills(text), extra = null;
+  if (cap.sample){
+    try {
+      extra = await withTimeout(cap.sample.json("Extract job-relevant information from this résumé. Ignore and never output names, contact details, gender, race, ethnicity, age, religion, disability, or similar personal traits. Reply with only JSON {\"skills\":[up to 12 lowercase skills/tools],\"experience\":[up to 4 short items like 'marketing internship']}.\n\n" + text, { modelTier:"quick" }), 20000);
+    } catch (e) { logEvent("ai_error","resume", e && e.code || "timeout"); }
+  }
+  if (extra && Array.isArray(extra.skills)) found = uniq([...found, ...extra.skills.map(lc)]);
+  if (extra && Array.isArray(extra.experience)) P.keywords.push(...extra.experience.map(lc).flatMap(x => x.split(" ").filter(w => w.length > 3)));
+  P.resumeSkills = uniq([...P.resumeSkills, ...found]);
+  S.queue = [];
+  logEvent("resume","skills", P.resumeSkills.join(", "));
+  saveProfile();
+  if (fresh && PREFS.remember && PREFS.saveResume) saveResumeLocal(text, P.resumeSkills);
+  if (!found.length){ await say("I read it but didn't spot specific skills. Pick a few below and I'll use those."); return resumeStep(wasStep); }
+  await say(T("resumeFound", { x: found.slice(0, 12).join(", ") }));
+  S.step = { k:"resume", prev:wasStep };
+  suggest({ k:"resume" }, { legend:"Remove any that don't fit", doneLabel:"Remove selected", opts:found.slice(0, 12), multi:true, extra:[{ label:"Looks right", fn:() => { clearSuggest(); you("Looks right"); afterResume(wasStep, text, fresh); } }],
+    onPick:(v) => { P.resumeSkills = P.resumeSkills.filter(x => !v.includes(x)); logEvent("resume","removed", v.join(", ")); saveProfile(); afterResume(wasStep, text, fresh); } });
+}
+async function afterResume(wasStep, text, fresh){
+  if (fresh && !PREFS.saveResume){
+    await say(T("resumeSave"));
+    return suggest({ k:"resumeSave" }, { legend:"Keep résumé on this device?", multi:false, opts:["Yes, keep it","No thanks"], onPick: async (v) => {
+      const yes = v[0].startsWith("Yes");
+      logEvent("resume_save","resume", yes ? "yes" : "no");
+      if (yes){ PREFS.saveResume = true; PREFS.remember = true; savePrefs(); $("tResume").checked = true; $("tRemember").checked = true; saveResumeLocal(text, P.resumeSkills); saveProfile(); await say("Saved on this device only. You can delete it anytime in Settings.", { delay:700 }); }
+      continueAfterResume(wasStep);
+    } });
+  }
+  if (fresh && PREFS.saveResume) saveResumeLocal(text, P.resumeSkills);
+  continueAfterResume(wasStep);
+}
+function continueAfterResume(wasStep){
+  if (wasStep && wasStep.k === "q" && (wasStep.id === "skills" || wasStep.id === "exp" || (wasStep.id || "").startsWith("exp:")) && S.phase === "intake"){
+    if (wasStep.id === "skills") logEvent("answer","skills","from résumé");
+    return nextQuestion();
+  }
+  if (S.phase === "results") return runSearch("Thanks, I've added those. Here's the updated list.");
+  resumeStep(wasStep);
+}
+
+/* ===== full-screen board ===== */
+let boardTab = "all", boardReturn = null;
+function openBoard(tab){
+  boardReturn = document.activeElement;
+  boardTab = tab || "all"; renderBoard();
+  $("board").hidden = false; $("bClose").focus();
+  logEvent("board_open","results", boardTab);
+}
+function closeBoard(){ if ($("board").hidden) return; $("board").hidden = true; boardReturn && boardReturn.focus && boardReturn.focus(); }
+function renderBoard(){
+  const tabs = { all:$("tabAll"), saved:$("tabSaved"), applied:$("tabApplied") };
+  const ranked = rank();
+  const lists = {
+    all: ranked,
+    saved: S.saved.map(jobByUrl).filter(Boolean).map(j => Object.assign({ j }, score(j))),
+    applied: S.applied.map(jobByUrl).filter(Boolean).map(j => Object.assign({ j }, score(j)))
+  };
+  tabs.all.textContent = "Matches (" + lists.all.length + ")";
+  tabs.saved.textContent = "Saved (" + lists.saved.length + ")";
+  tabs.applied.textContent = "Applied (" + lists.applied.length + ")";
+  for (const [k, b] of Object.entries(tabs)) b.setAttribute("aria-selected", k === boardTab ? "true" : "false");
+  $("blist").setAttribute("aria-labelledby", tabs[boardTab].id);
+  const grid = $("bgrid"); grid.replaceChildren();
+  const list = lists[boardTab];
+  if (!list.length) grid.append(h("p", { class:"empty" }, boardTab === "saved" ? "No saved jobs yet. Tap Save on any job to keep it here." : boardTab === "applied" ? "Nothing marked as applied yet. Tap Mark applied after you apply." : "No jobs to show."));
+  else list.forEach(r => grid.append(jobCard(r)));
+}
+$("tabAll").onclick = () => { boardTab = "all"; renderBoard(); };
+$("tabSaved").onclick = () => { boardTab = "saved"; renderBoard(); };
+$("tabApplied").onclick = () => { boardTab = "applied"; renderBoard(); };
+$("bClose").onclick = closeBoard;
+
+/* ===== freshness ===== */
+function parseDay(s){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ""));
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  const d = new Date(s); return isNaN(d) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+const shortDate = s => { const d = parseDay(s); return d ? d.toLocaleDateString([], { month:"short", day:"numeric" }) : s; };
+function tsOf(j){
+  if (j && j.checkedAt){ const d = new Date(j.checkedAt); if (!isNaN(d)) return d; }
+  const day = parseDay(j && j.checked); return day ? new Date(day.getTime() + 12 * 36e5) : null;
+}
+const exact = j => !!(j && j.checkedAt && !isNaN(new Date(j.checkedAt)));
+function ago(d){
+  const sec = Math.max(0, (Date.now() - d.getTime()) / 1000);
+  if (sec < 60) return "just now";
+  const min = Math.floor(sec / 60); if (min < 60) return min + (min === 1 ? " minute ago" : " minutes ago");
+  const hr = Math.floor(min / 60); if (hr < 24) return hr + (hr === 1 ? " hour ago" : " hours ago");
+  const day = Math.floor(hr / 24); if (day === 1) return "1 day ago";
+  return day + " days ago";
+}
+function ageText(j){ const d = tsOf(j); if (!d) return ""; return exact(j) ? "Updated " + ago(d) : "Checked " + shortDate(j.checked); }
+function freshInfo(){
+  let d = META.updatedAt ? new Date(META.updatedAt) : null;
+  if (d && isNaN(d)) d = null;
+  const stamps = JOBS.map(tsOf).filter(Boolean);
+  if (stamps.length){ const latest = new Date(Math.max(...stamps)); if (!d || latest > d) d = latest; }
+  if (!d){ const day = parseDay(META.updated); if (day) d = day; }
+  if (!d) return null;
+  const hours = (Date.now() - d.getTime()) / 36e5;
+  return { days:Math.floor(hours / 24), rel:ago(d), long:d.toLocaleString([], { weekday:"long", month:"long", day:"numeric", hour:"numeric", minute:"2-digit" }) };
+}
+function renderFresh(){
+  const el = $("fresh"), fr = freshInfo();
+  if (!fr || !JOBS.length){ el.hidden = true; return; }
+  el.hidden = false;
+  el.replaceChildren(h("span", { class:"wide-only" }, "Jobs last refreshed "), h("span", { class:"narrow-only" }, "Refreshed "), fr.rel, h("span", { class:"wide-only" }, " · " + JOBS.length + " jobs"));
+  el.title = "Last refreshed " + fr.long;
+  el.classList.toggle("old", fr.days >= 2);
+}
+function tickAges(){
+  document.querySelectorAll("time.age").forEach(t => { const j = jobByUrl(t.dataset.url); if (j) t.lastChild.textContent = ageText(j); });
+  renderFresh();
+}
+setInterval(tickAges, 30000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) tickAges(); });
+
+/* ===== jobs ===== */
+async function loadJobs(){
+  try {
+    const r = await fetch("jobs.json", { cache:"no-store" });
+    if (!r.ok) throw 0;
+    const data = await r.json();
+    JOBS = Array.isArray(data.jobs) ? data.jobs.filter(j => j && j.title && j.url) : [];
+    META = data;
+  } catch { JOBS = []; }
+  setProgress(); renderFresh();
+}
+
+/* ===== setup + settings ===== */
+function toneOptions(container, onChange){
+  container.replaceChildren(...TONES.map(t => h("button", { type:"button", class:"opt", role:"radio", "aria-checked": PREFS.tone === t.id ? "true" : "false",
+    onclick:() => { PREFS.tone = t.id; savePrefs(); onChange && onChange(); toneOptions(container, onChange); logEvent("tone","settings", t.id); } }, h("b", {}, t.name), h("span", {}, t.eg))));
+}
+function themeOptions(container){
+  container.replaceChildren(...[["system","Match device"],["light","Light"],["dark","Dark"]].map(([id, label]) => h("button", { type:"button", class:"chip", role:"radio", "aria-checked": PREFS.theme === id ? "true" : "false",
+    onclick:() => { PREFS.theme = id; savePrefs(); applyTheme(); themeOptions(container); } }, label)));
+}
+function openSetup(){
+  return new Promise(resolve => {
+    toneOptions($("suTone")); themeOptions($("suTheme"));
+    $("setup").hidden = false;
+    const first = $("suTone").querySelector('[aria-checked="true"]'); first && first.focus();
+    const close = (skipped) => { if (skipped){ PREFS.tone = "standard"; } PREFS.setupDone = true; savePrefs(); $("setup").hidden = true; logEvent("setup", "tone", skipped ? "skipped (standard)" : PREFS.tone); resolve(); };
+    $("suSkip").onclick = () => close(true);
+    $("suGo").onclick = () => close(false);
+  });
+}
+let settingsReturn = null;
+async function openSettings(){
+  settingsReturn = document.activeElement;
+  toneOptions($("stTone")); themeOptions($("stTheme"));
+  $("tBig").checked = !!PREFS.big; $("tFast").checked = !!PREFS.fast;
+  $("tResearch").checked = !!consent; $("tRemember").checked = !!PREFS.remember; $("tResume").checked = !!PREFS.saveResume;
+  $("stMsg").textContent = "";
+  $("settings").hidden = false; $("stClose").focus();
+  await capReady;
+  $("hostSec").hidden = !cap.owner;
+  if (cap.owner) $("hostStats").textContent = "Only you can see this. Listings: " + JOBS.length + ". This chat: " + LOG.length + " events, session " + CODE() + ".";
+}
+function closeSettings(){ $("settings").hidden = true; settingsReturn && settingsReturn.focus && settingsReturn.focus(); }
+$("bSettings").onclick = openSettings;
+$("stClose").onclick = closeSettings;
+$("tBig").onchange = e => { PREFS.big = e.target.checked; savePrefs(); applyTheme(); };
+$("tFast").onchange = e => { PREFS.fast = e.target.checked; savePrefs(); };
+$("tResearch").onchange = e => { consent = e.target.checked; logEvent("consent","settings", consent ? "yes" : "no"); };
+$("tRemember").onchange = e => { PREFS.remember = e.target.checked; if (!PREFS.remember){ PREFS.saveResume = false; $("tResume").checked = false; deleteSaved(); $("stMsg").textContent = "Saved answers deleted from this device."; } else saveProfile(); savePrefs(); };
+$("tResume").onchange = e => { PREFS.saveResume = e.target.checked; if (PREFS.saveResume){ PREFS.remember = true; $("tRemember").checked = true; saveProfile(); $("stMsg").textContent = "Your next upload will be kept on this device."; } else { LS.del("lucy.resume"); $("stMsg").textContent = "Saved résumé deleted from this device."; } savePrefs(); };
+$("stDelete").onclick = () => { deleteSaved(); PREFS.remember = false; PREFS.saveResume = false; savePrefs(); $("tRemember").checked = false; $("tResume").checked = false; $("stMsg").textContent = "All saved data on this device is deleted."; logEvent("delete_saved","settings",""); };
+$("stMine").onclick = () => saveFile("lucy-my-chat-" + new Date().toISOString().slice(0,10) + ".csv", toCSV(LOG), $("stMsg"));
+$("stAll").onclick = async () => {
+  $("stMsg").textContent = "Gathering the log…";
+  try { const rows = await allLogs(); await saveFile("lucy-research-log-" + new Date().toISOString().slice(0,10) + ".csv", toCSV(rows), $("stMsg")); }
+  catch { $("stMsg").textContent = "Couldn't read the research log here."; }
+};
+$("bTheme").onclick = () => { PREFS.theme = isDark() ? "light" : "dark"; savePrefs(); applyTheme(); };
+
+/* ===== controls ===== */
+$("form").addEventListener("submit", e => {
+  e.preventDefault();
+  if (S.busy) return;
+  const t = $("msg").value.trim(); $("msg").value = "";
+  if (!t){ if (SUG && SUG.multi && selected().length) commit(selected(), ""); return; }
+  onFree(t);
+});
+$("msg").addEventListener("input", updateDone);
+$("bAttach").onclick = () => $("file").click();
+$("file").onchange = e => { const f = e.target.files[0]; e.target.value = ""; onResume(f); };
+$("bRestart").onclick = () => { if (S.busy) return; clearSuggest(); confirmRestart(); };
+function trap(e, root){
+  const f = [...root.querySelectorAll("button,input,a[href]")].filter(x => !x.hidden && x.offsetParent !== null);
+  if (!f.length) return; const a = f[0], z = f[f.length - 1];
+  if (e.shiftKey && document.activeElement === a){ e.preventDefault(); z.focus(); }
+  else if (!e.shiftKey && document.activeElement === z){ e.preventDefault(); a.focus(); }
+}
+document.addEventListener("keydown", e => {
+  const open = !$("settings").hidden ? $("settings") : !$("board").hidden ? $("board") : !$("setup").hidden ? $("setup") : null;
+  if (!open) return;
+  if (e.key === "Escape"){ if (open === $("settings")) closeSettings(); else if (open === $("board")) closeBoard(); }
+  if (e.key === "Tab") trap(e, open);
+});
+$("settings").addEventListener("click", e => { if (e.target === $("settings")) closeSettings(); });
+
+/* ===== boot ===== */
+async function boot(data){
+  applyTheme();
+  await loadJobs();
+  const st = (data && data.lucy) || SS.get("lucy.session");
+  if (st && st.v === 2 && st.TR && st.TR.length && JOBS.length){ PREFS.setupDone = true; restore(st); }
+  else start();
+}
+const hot = window.claude && window.claude.hot;
+if (hot && hot.ready) hot.ready(d => boot(d || {}));
+else boot((hot && hot.data) || {});
+})();
+</script>
+
+</body>
+</html>
