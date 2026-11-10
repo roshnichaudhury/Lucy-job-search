@@ -402,6 +402,16 @@ const h = (tag, attrs = {}, ...kids) => {
 const LS = { get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }, del(k){ try { localStorage.removeItem(k); } catch {} } };
 const SS = { get(k){ try { return JSON.parse(sessionStorage.getItem(k)); } catch { return null; } }, set(k,v){ try { sessionStorage.setItem(k, JSON.stringify(v)); } catch {} }, del(k){ try { sessionStorage.removeItem(k); } catch {} } };
 
+/* ===== tester mode =====
+   Team members open Lucy once with ?tester=1 on each device they test from. From then on every
+   session from that browser is logged with a "test-" session id, so the team's own tests can be
+   filtered out of pilot results. ?tester=0 turns it off. Outside users never see or need this. */
+const TESTER = (() => {
+  try { const t = new URLSearchParams(location.search).get("tester"); if (t === "1") LS.set("lucy.tester", true); if (t === "0") LS.del("lucy.tester"); } catch {}
+  return LS.get("lucy.tester") === true;
+})();
+if (TESTER) { const s = document.getElementById("sub"); if (s) s.textContent += " · Tester mode"; }
+
 /* ===== preferences ===== */
 const PREFS = Object.assign({ tone:"standard", theme:"system", big:false, fast:false, remember:false, saveResume:false, setupDone:false }, LS.get("lucy.prefs") || {});
 const savePrefs = () => LS.set("lucy.prefs", PREFS);
@@ -624,7 +634,7 @@ const capReady = (async () => {
 /* ===== interaction log ===== */
 let LOG = [], flushed = 0, writeChain = Promise.resolve(), userDocWritten = false, remoteQ = [], remoteTimer = null;
 function logEvent(kind, step, value){
-  LOG.push({ session:SID, t:new Date().toISOString(), kind, step:step || "", value:scrub(String(value ?? "")).slice(0, 600), tone:PREFS.tone });
+  LOG.push({ session:(TESTER ? "test-" : "") + SID, t:new Date().toISOString(), kind, step:step || "", value:scrub(String(value ?? "")).slice(0, 600), tone:PREFS.tone });
   if (consent === false) flushed = LOG.length;
   if (consent) flushLog();
   saveSession();
@@ -991,7 +1001,7 @@ function jobCard(r){
       r.why.map(w => h("span", { class:"tag ok" }, h("span", { class:"sr" }, "Match: "), w)),
       r.warn.map(w => h("span", { class:"tag warn" }, h("span", { class:"sr" }, "Heads up: "), w))) : null,
     h("div", { class:"jact" },
-      linkOut(h("a", { href:j.url, target:"_blank", rel:"noopener noreferrer", onclick:() => logEvent("open_posting","job", j.company + " — " + j.title) }, "View posting")),
+      linkOut(h("a", { href:j.url, target:"_blank", rel:"noopener noreferrer", onclick:() => logEvent("open_posting","job", j.company + " — " + j.title), onauxclick:(e) => { if (e.button === 1) logEvent("open_posting","job", j.company + " — " + j.title); }, oncontextmenu:() => logEvent("open_menu","job", j.company + " — " + j.title) }, "View posting")),
       save, applied, no, h("span", { class:"src" }, "via " + (j.source || "job board")))
   );
 }
