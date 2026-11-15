@@ -436,10 +436,10 @@ try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", appl
 
 /* ===== tone ===== */
 const TONES = [
-  { id:"standard", name:"Standard", eg:"Clear and friendly." },
-  { id:"friendly", name:"Warm and upbeat", eg:"Extra encouraging." },
-  { id:"professional", name:"Professional", eg:"Polished and formal." },
-  { id:"brief", name:"Straight to the point", eg:"As short as possible." }
+  { id:"standard", name:"Standard", eg:"“Nice. Where should I look?”" },
+  { id:"friendly", name:"Warm and upbeat", eg:"“Love that! Where would you love to work?”" },
+  { id:"professional", name:"Professional", eg:"“Thank you. Which locations should I search?”" },
+  { id:"brief", name:"Straight to the point", eg:"“Location?” (fastest replies)" }
 ];
 const V = {
   greet1:{ standard:"Hi! I'm Lucy, an automated job-search assistant. I'll ask a few quick questions, then show real openings that fit you.",
@@ -489,6 +489,19 @@ const V = {
   restartQ:{ standard:"Start over? Your answers in this chat will be cleared.", brief:"Start over? This clears this chat." },
   resumed:{ standard:"Welcome back! I kept your place.", brief:"Picking up where you left off." }
 };
+/* small, varied reactions between questions (pilot users called Lucy "serious" and "boring") */
+const ACKS = { standard:["Got it.","Nice.","Thanks!","Perfect.","Great."], friendly:["Love that!","Ooh, nice!","Awesome!","Great pick!","Sounds good!"], professional:["Thank you.","Noted.","Understood."], brief:[] };
+const SKIPACK = { standard:"No problem, skipping that.", friendly:"No worries, we'll skip that!", professional:"Understood, we'll skip that.", brief:"" };
+const HALF = { standard:"Halfway there.", friendly:"Halfway there, you're doing great!", professional:"We are halfway through.", brief:"" };
+const FIELDN = { standard:"Nice, {n} of today's listings fit {x}.", friendly:"Ooh, {n} of today's listings fit {x}!", professional:"There are {n} current listings in {x}.", brief:"{n} listings fit {x}." };
+const FIELD0 = { standard:"Heads up: I only have a few listings in {x} right now, so I'll also show roles that use your skills.", brief:"Few {x} listings today; I'll add roles that fit your skills." };
+const pickT = set => set[PREFS.tone] ?? set.standard;
+function reaction(){
+  const k = S.lastAns; S.lastAns = null;
+  if (k === "s") return pickT(SKIPACK);
+  if (k !== "a") return "";
+  const list = pickT(ACKS); return list.length ? list[(S.qi + TR.length) % list.length] : "";
+}
 const EXP_Q = { standard:"What did you do in your {x}? Pick any or type your own.", friendly:"Tell me about your {x}! What did you do there? Pick any or type your own.", professional:"What were your responsibilities in your {x}? Select any or type your own.", brief:"Your {x}: what did you do?" };
 function T(key, vars = {}){
   const set = key === "exp" ? EXP_Q : V[key];
@@ -516,6 +529,7 @@ function redactResume(text){
 
 /* ===== vocabulary ===== */
 const SKILL_WORDS = ["excel","sql","python","tableau","power bi","javascript","java","c++","html","css","react","figma","adobe","photoshop","illustrator","canva","writing","editing","social media","seo","google analytics","salesforce","hubspot","crm","customer service","sales","research","data analysis","statistics","public speaking","presentation","project management","marketing","communication","leadership","spanish","accounting","quickbooks","financial modeling","powerpoint","microsoft office","git","aws","linux","networking","cybersecurity","ux","ui","wordpress","video editing","photography","lab","clinical","teaching","tutoring","event planning","scheduling","budgeting","copywriting","content","analytics","machine learning"];
+const SOFT_SKILLS = ["customer service","communication","presentation","public speaking","leadership","writing","research","microsoft office","scheduling","teaching","tutoring","powerpoint","event planning"];
 const FIELD_KEYS = {
   "Business":["business","operations","sales","consult","finance","account","strategy","development"],
   "Marketing":["marketing","brand","social","content","growth","campaign","seo"],
@@ -551,6 +565,26 @@ const FIELD_KEYS = {
   "Design":["design","ux","ui","graphic","creative"]
 };
 
+/* typed majors/interests ("International Affairs") are mapped to job words so they count as a field, not just a weak keyword */
+const AREA_ALIAS = [
+  [/international|global|foreign|diplomac|politic|policy|public admin|pre-?law|\blaw\b|criminal|justice/, ["policy","international","global","government","advocacy","nonprofit","diplomat","foreign"]],
+  [/bio|chem|neuro|kinesio|health|pre-?med|nurs|nutrition|exercise|pharm|science/, ["health","clinical","lab","research","patient","science","medical","care"]],
+  [/english|writing|literature|journalism|communicat|film|media|advertis|public relations/, ["writer","editor","editorial","content","media","communications","marketing"]],
+  [/math|physics|actuar|statistic|quantitative/, ["data","analyst","analytics","quantitative","research","engineer"]],
+  [/sociolog|anthropolog|human development|social work|psych|human resources/, ["research","program","community","people","human resources","recruit","talent"]],
+  [/environment|ecolog|geograph|agri|forestry|sustainab|climate/, ["sustainab","climate","energy","environment","research","program"]],
+  [/history|philosoph|religio|classics|language|spanish|french|linguist/, ["research","writer","program","education","content","communications"]],
+  [/sport|recreation|tourism|hotel|event|hospitality/, ["event","hospitality","marketing","operations","community","sports"]],
+  [/management|business|entrepreneur|mba|commerce/, ["business","operations","sales","consult","strategy","development"]],
+  [/computer|software|cyber|information|data/, ["software","engineer","developer","data","security","technical","analyst"]]
+];
+const STOPW = new Set(["and","the","with","major","minor","studies","study","degree","of","in","for","none","these","nothing","sure"]);
+function customArea(label){
+  const t = lc(label), hit = AREA_ALIAS.find(([re]) => re.test(t));
+  return { label, keys: hit ? hit[1] : t.split(/[^a-z]+/).filter(w => w.length > 3 && !STOPW.has(w)) };
+}
+const NONE_ANS = /^(none( of (these|them|the above))?|nothing|n\/?a|na|not sure|idk|i don'?t know|no idea|skip|nope)$/;
+
 /* ===== questions ===== */
 const EXP_OPTS = ["Internship","Part-time job","Research","Class projects","Club leadership","Volunteering","Not much yet"];
 const Q = [
@@ -559,13 +593,13 @@ const Q = [
   { id:"stage", opts:["Freshman or sophomore","Junior","Graduating this year","Recent grad","Grad student","1–2 years of work","Switching careers"], multi:false,
     apply:(v,t)=>P.stage = v[0] || t || null },
   { id:"major", opts:["Business","Marketing","Communications","Journalism","Computer Science","Information Systems","Data / Statistics","Economics","Finance","Accounting","Political Science","Psychology","Biology / Health","Nursing / Pre-med","Engineering","Design / Art","Education","Hospitality","Supply Chain","Undecided"], multi:true, free:true,
-    apply:(v,t)=>{ P.major = v; if (t) P.keywords.push(...splitList(t).map(lc)); } },
+    apply:(v,t)=>{ P.major = v; if (t){ P.keywords.push(...splitList(t).map(lc)); P.customAreas = uniq([...P.customAreas.map(c => c.label), ...splitList(t)]).map(customArea); } } },
   { id:"skills", opts:["Excel","SQL","Python","Tableau","Data analysis","Writing","Editing","Social media","Canva","Figma / Adobe","Video editing","PowerPoint","Public speaking","Customer service","Sales","Salesforce","Accounting","Research","Project management","Event planning","Leadership","Spanish"], multi:true, free:true, resume:true,
     apply:(v,t)=>{ P.skills = uniq([...P.skills, ...v.map(normSkill), ...splitList(t).map(lc)]); } },
   { id:"exp", opts:EXP_OPTS, multi:true,
     apply:(v)=>{ P.experience = v; S.queue = hasResume() ? [] : v.filter(x => x !== "Not much yet"); } },
   { id:"interests", opts:["Tech","Marketing & media","Media & entertainment","Finance","Healthcare","Education","Nonprofit & policy","Government","Design","Science & research","Sales & business","Startups","Logistics & supply chain","Events & hospitality","Sustainability","Open to anything"], multi:true, free:true,
-    apply:(v,t)=>{ P.interests = v; if (t) P.keywords.push(...splitList(t).map(lc)); } },
+    apply:(v,t)=>{ P.interests = v; if (t){ P.keywords.push(...splitList(t).map(lc)); P.customAreas = uniq([...P.customAreas.map(c => c.label), ...splitList(t)]).map(customArea); } } },
   { id:"style", opts:["Remote","Hybrid","On-site"], multi:true,
     apply:(v)=>P.workStyle = v },
   { id:"where", opts:["Atlanta, GA","Athens, GA","New York, NY","Washington, DC","Boston, MA","Chicago, IL","San Francisco, CA","Los Angeles, CA","Remote only","Anywhere in the US","Open to relocating"], multi:true, free:true,
@@ -608,10 +642,10 @@ function qText(q){ return q.text ? q.text() : T("q_" + q.id); }
 /* ===== state ===== */
 let P, S, TR, SID;
 function newSID(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
-function freshP(){ return { types:[], stage:null, major:[], skills:[], resumeSkills:[], experience:[], interests:[], workStyle:[], places:[], anywhere:false, relocate:false, minPay:null, start:null, sponsor:null, keywords:[], notes:[], avoidFields:[], seniorPenalty:0 }; }
+function freshP(){ return { types:[], stage:null, major:[], skills:[], resumeSkills:[], experience:[], interests:[], workStyle:[], places:[], anywhere:false, relocate:false, minPay:null, start:null, sponsor:null, keywords:[], focus:[], customAreas:[], notes:[], avoidFields:[], seniorPenalty:0 }; }
 function fresh(){
   P = freshP();
-  S = { phase:"setup", qi:-1, queue:[], step:null, followups:[], fu:0, page:0, saved:[], applied:[], dismissed:[], busy:false, route:{} };
+  S = { phase:"setup", qi:-1, queue:[], shown:[], step:null, followups:[], fu:0, page:0, saved:[], applied:[], dismissed:[], busy:false, route:{} };
   TR = []; SID = newSID();
 }
 fresh();
@@ -722,10 +756,14 @@ function addRow(who, content, opts = {}){
   return row;
 }
 function scrollDown(){ requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; }); }
+/* pacing: pilot users rated the typing pause lowest (3.6/5), so pauses are short and capped.
+   "Faster replies" or the brief tone skip almost all of the pause. */
+const quick = () => PREFS.fast || PREFS.tone === "brief";
 function delayFor(text){
   const n = typeof text === "string" ? text.length : 140;
-  return PREFS.fast ? 300 : Math.max(850, Math.min(2000, 600 + n * 13));
+  return quick() ? 150 : Math.max(350, Math.min(900, 250 + n * 5));
 }
+const shortPause = () => quick() ? 150 : 400;
 async function say(content, opts = {}){
   S.busy = true; setBusy(true);
   const dots = h("div", { class:"row bot", "aria-hidden":"true" }, h("div", { class:"bubble typing" }, h("i"), h("i"), h("i")));
@@ -819,7 +857,7 @@ function stepConsent(){
       consent = /^(yes|y|sure|ok|okay|i consent)\b/i.test(v[0] || t || "");
       $("tResearch").checked = consent;
       logEvent("consent", "consent", consent ? "yes" : "no");
-      await say(consent ? T("consentYes") : T("consentNo"), { delay: PREFS.fast ? 300 : 900 });
+      await say(consent ? T("consentYes") : T("consentNo"), { delay: shortPause() });
       const prof = LS.get("lucy.profile");
       if (PREFS.remember && prof && prof.P) return askWelcome(prof);
       await say(T("remember")); stepRemember();
@@ -831,7 +869,7 @@ function stepRemember(){
       PREFS.remember = v[0].startsWith("Yes"); savePrefs(); $("tRemember").checked = PREFS.remember;
       if (!PREFS.remember) deleteSaved();
       logEvent("remember", "remember", PREFS.remember ? "yes" : "no");
-      await say(PREFS.remember ? T("rememberYes") : T("rememberNo"), { delay: PREFS.fast ? 300 : 900 });
+      await say(PREFS.remember ? T("rememberYes") : T("rememberNo"), { delay: shortPause() });
       S.phase = "intake"; nextQuestion();
     } });
 }
@@ -866,7 +904,8 @@ async function nextQuestion(){
     if (S.qi >= Q.length) return followups();
     q = Q[S.qi];
   }
-  await say(qText(q));
+  const lead = [reaction(), (!S.queue.length && S.qi === 6 && Q[S.qi] === q) ? pickT(HALF) : ""].filter(Boolean).join(" ");
+  await say((lead ? lead + " " : "") + qText(q));
   stepQuestion(q);
 }
 function stepQuestion(q){
@@ -877,11 +916,27 @@ function stepQuestion(q){
   if (!q.opts.length) $("msg").focus();
 }
 async function answer(q, v, t, skipped){
+  const tt = lc(t).replace(/[.!]+$/, "");
+  if (!skipped && !v.length && tt && NONE_ANS.test(tt)) skipped = true;
+  let lowConfidence = false;
+  if (!skipped && q.id === "skills" && t && !extractSkills(t).length && t.trim().split(/\s+/).length > 3){ lowConfidence = true; t = ""; if (!v.length) skipped = true; }
   if (!skipped) q.apply(v, t || "");
   if (Q.some(x => x.id === q.id)) { S.route[q.id] = skipped ? "s" : "a"; setProgress(); }
   logEvent(skipped ? "skip" : "answer", q.id, skipped ? "" : [...v, t].filter(Boolean).join(" | "));
   saveProfile();
-  if (!skipped && t && (q.id === "major" || q.id === "interests")) await say(T("ack", { x: t.slice(0, 60) }));
+  S.lastAns = skipped ? "s" : "a";
+  if (q.id === "major" && !skipped && S.phase !== "edit"){
+    const names = [...P.major.filter(m => m !== "Undecided"), ...P.customAreas.map(c => c.label)];
+    if (names.length){
+      const keys = [...P.major.flatMap(m => FIELD_KEYS[m] || []), ...P.customAreas.flatMap(c => c.keys)];
+      const n = JOBS.filter(j => { const ft = " " + lc(j.title + " " + j.field) + " "; return keys.some(k => ft.includes(k)); }).length;
+      const x = names.slice(0, 2).join(" / ");
+      await say(n >= 5 ? pickT(FIELDN).replace("{n}", n).replace("{x}", x) : pickT(FIELD0).replace("{x}", x));
+      S.lastAns = null;
+    }
+  }
+  if (lowConfidence) await say(PREFS.tone === "brief" ? "No problem. Your other answers will guide the search." : "That's okay, most students undersell themselves. I'll lean on your other answers, and you can add skills later with “Change my answers”.");
+  if (!skipped && t && q.id === "interests"){ await say(T("ack", { x: t.slice(0, 60) })); S.lastAns = null; }
   if (S.phase === "edit"){ S.queue = []; S.phase = "results"; setProgress(); return runSearch("Updated. Here's the new list."); }
   nextQuestion();
 }
@@ -920,7 +975,7 @@ const withTimeout = (p, ms) => Promise.race([p, new Promise((_, r) => setTimeout
 
 /* ===== matching (uses only job-related answers) ===== */
 function profileSummary(){
-  return { jobTypes:P.types, stage:P.stage, majors:P.major, skills:uniq([...P.skills, ...P.resumeSkills]), experience:P.experience, interests:P.interests,
+  return { jobTypes:P.types, stage:P.stage, majors:[...P.major, ...(P.customAreas || []).map(c => c.label)], skills:uniq([...P.skills, ...P.resumeSkills]), experience:P.experience, interests:P.interests,
     workStyle:P.workStyle, places:P.places, anywhereInUS:P.anywhere, openToRelocating:P.relocate, minSalary:P.minPay, start:P.start, needsSponsorship:P.sponsor, notes:P.notes.slice(-4), extraKeywords:uniq(P.keywords).slice(0,20) };
 }
 const jobText = j => lc([j.title, j.field, j.summary, (j.skills||[]).join(" "), j.company].join(" "));
@@ -936,13 +991,17 @@ function score(j){
   s -= P.seniorPenalty * (/Early/.test(j.level || "") ? 2 : 0);
   const skills = uniq([...P.skills, ...P.resumeSkills].map(lc)).filter(x => x.length > 1);
   const hit = skills.filter(k => (j.skills||[]).some(js => lc(js).includes(k) || k.includes(lc(js))) || new RegExp("\\b" + k.replace(/[.*+?^${}()|[\]\\]/g,"\\$&") + "\\b").test(t));
-  s += Math.min(hit.length, 4) * 2;
+  const softHits = hit.filter(k => SOFT_SKILLS.includes(k)), hardHits = hit.filter(k => !SOFT_SKILLS.includes(k));
+  s += Math.min(hardHits.length, 4) * 2 + Math.min(softHits.length, 2);
   if (hit.length) why.push("Uses " + hit.slice(0,3).join(", "));
   const areas = [...P.major, ...P.interests].filter(a => FIELD_KEYS[a]);
   const ft = " " + lc(j.title + " " + j.field) + " ";
-  const fieldHit = areas.find(a => FIELD_KEYS[a].some(k => ft.includes(k)));
+  const custom = P.customAreas || [];
+  const fieldHit = areas.find(a => FIELD_KEYS[a].some(k => ft.includes(k))) || (custom.find(c => c.keys.some(k => ft.includes(k))) || {}).label;
   if (fieldHit){ s += 3; why.push("Fits " + fieldHit.replace(" / ", "/")); }
-  else if (areas.length && !P.interests.includes("Open to anything")) s -= 4;
+  else if ((areas.length || custom.length) && !P.interests.includes("Open to anything")) s -= 4;
+  const focus = (P.focus || []).find(k => t.includes(k));
+  if (focus){ s += 6; why.push("Mentions " + focus); }
   const kw = uniq(P.keywords).filter(k => k.length > 2 && t.includes(k));
   s += Math.min(kw.length, 3);
   if (kw.length && !hit.length) why.push("Mentions " + kw.slice(0,2).join(", "));
@@ -967,7 +1026,19 @@ function score(j){
   }
   return { s, why, warn, fieldHit:!!fieldHit, skillHit:hit.length };
 }
-const rank = () => JOBS.filter(j => !S.dismissed.includes(j.url)).map(j => ({ j, ...score(j) })).sort((a, b) => b.s - a.s);
+/* variety: ties are ordered differently each session, and a page shows at most one job per employer */
+function tieKey(u){ let x = 0; const str = SID + u; for (let i = 0; i < str.length; i++) x = (x * 31 + str.charCodeAt(i)) | 0; return x; }
+const rank = () => JOBS.filter(j => !S.dismissed.includes(j.url)).map(j => ({ j, ...score(j) })).sort((a, b) => (b.s - a.s) || (tieKey(a.j.url) - tieKey(b.j.url)));
+function employerKey(j){
+  const c = lc(j.company), via = /\(via ([^)]+)\)/.exec(c);
+  return (via ? via[1] : c.replace(/\(.*?\)/g, "")).replace(/[^a-z0-9 ]/g, " ").trim().split(/\s+/).slice(0, 2).join(" ");
+}
+function pickPage(ranked, n){
+  const seen = new Set(S.shown || []), pool = ranked.filter(r => !seen.has(r.j.url)), out = [], used = new Set();
+  for (const r of pool){ if (out.length >= n) break; const k = employerKey(r.j); if (used.has(k)) continue; used.add(k); out.push(r); }
+  for (const r of pool){ if (out.length >= n) break; if (!out.includes(r)) out.push(r); }
+  return out;
+}
 const money = n => "$" + Math.round(n/1000) + "k";
 function payText(j){
   if (j.salaryMin != null && j.salaryMax != null && j.salaryMin !== j.salaryMax) return money(j.salaryMin) + "–" + money(j.salaryMax);
@@ -1020,7 +1091,7 @@ async function showJobs(list, delay){
 async function runSearch(lead){
   S.phase = "results"; setProgress();
   if (!JOBS.length) return searchFailed();
-  S.page = 0;
+  S.page = 0; S.shown = [];
   const ranked = rank();
   logEvent("search", "results", JSON.stringify(profileSummary()).slice(0, 600));
   await say(lead || (ranked.some(r => r.s >= 2) ? T("results", { n:JOBS.length }) : T("nomatch")));
@@ -1028,11 +1099,11 @@ async function runSearch(lead){
 }
 async function showPage(first){
   const ranked = rank();
-  const list = ranked.slice(S.page * 4, S.page * 4 + 4);
-  S.page++;
+  const list = pickPage(ranked, 4);
+  S.page++; S.shown = [...(S.shown || []), ...list.map(r => r.j.url)];
   if (!list.length){ await say(T("end")); return resultChips(); }
   list.forEach(r => logEvent("shown","job", r.j.company + " — " + r.j.title + " (score " + r.s + ")"));
-  await showJobs(list, PREFS.fast ? 300 : 1200);
+  await showJobs(list, quick() ? 150 : 600);
   const fr = freshInfo();
   if (fr && first) addRow("bot", h("span", { class:"note" }, "Listings last refreshed " + fr.rel + ". Fit is based only on what you told me; read each posting's requirements."), { rec:{ w:"note", t:"Listings last refreshed " + fr.rel + ". Fit is based only on what you told me; read each posting's requirements." } });
   resultChips();
@@ -1044,7 +1115,7 @@ async function stretch(){
   logEvent("stretch","results", alt.length);
   if (!alt.length){ await say("I don't have any outside-the-box picks right now."); return resultChips(); }
   await say(T("stretch"));
-  await showJobs(alt, PREFS.fast ? 300 : 1100);
+  await showJobs(alt, quick() ? 150 : 600);
   resultChips();
 }
 function resultChips(){
@@ -1080,7 +1151,7 @@ function privacyRecap(){
     "You can change any of this, or delete saved data, anytime in Settings."
   ];
   const title = PREFS.tone === "brief" ? "Privacy recap" : "Before you go, a quick privacy recap";
-  return say(h("div", { class:"recap" }, h("b", {}, title), h("ul", {}, items.map(x => h("li", {}, x)))), { delay: PREFS.fast ? 300 : 1400, rec:{ w:"bot", t:title + ":\n• " + items.join("\n• ") } });
+  return say(h("div", { class:"recap" }, h("b", {}, title), h("ul", {}, items.map(x => h("li", {}, x)))), { delay: shortPause(), rec:{ w:"bot", t:title + ":\n• " + items.join("\n• ") } });
 }
 function stepDone(){ suggest({ k:"done" }, { legend:"Anything else?", multi:false, opts:["Back to my jobs","See saved & applied","Start over"], onPick:(v) => { logEvent("action","done", v[0]); if (v[0] === "Start over") return start(); if (v[0] === "See saved & applied") openBoard("saved"); resultChips(); } }); }
 async function editMenu(){
@@ -1160,7 +1231,7 @@ function resumeStep(step){
   }
 }
 function restore(st){
-  P = Object.assign(freshP(), st.P); S = Object.assign({ queue:[], saved:[], applied:[], dismissed:[], route:{} }, st.S, { busy:false });
+  P = Object.assign(freshP(), st.P); S = Object.assign({ queue:[], shown:[], saved:[], applied:[], dismissed:[], route:{} }, st.S, { busy:false });
   TR = st.TR || []; SID = st.SID || newSID(); consent = st.consent ?? null; LOG = st.LOG || []; flushed = st.flushed || LOG.length;
   log.replaceChildren(); lastWho = null;
   log.append(h("div", { class:"day" }, new Date().toLocaleDateString([], { month:"long", day:"numeric", year:"numeric" })));
@@ -1175,24 +1246,60 @@ function restore(st){
 }
 
 /* ===== free text ===== */
+/* typed replies at button steps: map "yes", "no thanks", "start fresh" etc. to the matching button */
+const YES = /^(y|ya|yes+|yeah|yep|yup|sure|ok|okay|please|of course|i consent|consent|i agree|agree)\b/;
+const NO = /^(n|no+|nope|nah|no thanks|don'?t|do not|never mind|nevermind)\b/;
+function matchOption(text, opts){
+  const t = lc(text).replace(/[.!?]+$/, "");
+  if (!t || !opts || !opts.length) return null;
+  const exact = opts.find(o => lc(o) === t); if (exact) return exact;
+  if (YES.test(t)){ const o = opts.find(o => /^(yes|keep going|use my saved)/i.test(o)); if (o) return o; }
+  if (NO.test(t)){ const o = opts.find(o => /^(no|keep going)/i.test(o)); if (o) return o; }
+  if (t.length >= 3){ const o = opts.find(o => lc(o).includes(t) || t.includes(lc(o))); if (o) return o; }
+  return null;
+}
 async function onFree(text){
   if (SUG && S.phase !== "results"){
-    const cfg = SUG, sel = selected();
-    const picked = cfg.opts ? cfg.opts.filter(o => lc(o) === lc(text)) : [];
+    const cfg = SUG, sel = selected(), step = S.step;
+    let picked = cfg.opts ? cfg.opts.filter(o => lc(o) === lc(text)) : [];
+    if (!picked.length && !cfg.multi){ const m = matchOption(text, cfg.opts); if (m) picked = [m]; }
+    const isQuestion = step && (step.k === "q" || step.k === "fu" || step.k === "nfm");
+    if (!isQuestion && !picked.length){
+      // a button-only step (consent, remember, restart...): never guess, and never leave the user without buttons
+      clearSuggest(); you(text); logEvent("message", step && step.k, text);
+      await say("Sorry, I didn't catch that. Just tap one of these:", { delay: shortPause() });
+      return resumeStep(step);
+    }
     clearSuggest(); you([...sel, text].join(", "));
     cfg.onPick(uniq([...sel, ...picked]), picked.length ? "" : text, false);
     return;
   }
   you(text); clearSuggest();
   logEvent("message", S.phase, text);
-  if (S.phase !== "results") return say("One moment, I'm still getting set up.");
-  const t = lc(text);
+  if (S.phase !== "results"){
+    await say("I'm here! Tap an option below to keep going.", { delay: shortPause() });
+    return resumeStep(S.step);
+  }
+  const t = lc(text).replace(/[.!?]+$/, "");
   if (/^(more|show more|next)/.test(t)) return showPage();
   if (/start over|restart|reset/.test(t)) return confirmRestart();
+  if (/^(done|i'?m done|i am done|bye|goodbye|that'?s all|all set|finished|i'?m finished)\b/.test(t)) return finish();
+  if (/^(thanks|thank you|thank u|ty|thx|appreciate it)\b/.test(t)){
+    await say(PREFS.tone === "brief" ? "You're welcome." : "You're welcome! Keep browsing, or tap “I'm done” when you're finished.", { delay: shortPause() });
+    return resultChips();
+  }
   if (/full ?screen|see all|all jobs/.test(t)){ openBoard("all"); return resultChips(); }
   if (/stretch|outside|different field/.test(t)) return stretch();
   if (localParse(t)){ saveProfile(); return runSearch("Updated with that. Here's the new list."); }
   if (cap.sample) return aiReply(text);
+  // try the words themselves as a topic ("jobs relevant to tennis") before giving up
+  const topic = t.replace(/\b(find|show|me|give|get|any|some|a|an|the|job|jobs|role|roles|work|position|positions|relevant|related|to|in|with|about|for|that|involve|involving|please|i|want|like|would|something)\b/g, " ").replace(/\s+/g, " ").trim();
+  if (topic.length >= 3){
+    const n = JOBS.filter(j => jobText(j).includes(topic)).length;
+    if (n){ P.focus = uniq([...P.focus, topic]); saveProfile(); return runSearch("I found " + n + " listing" + (n > 1 ? "s" : "") + " that mention “" + topic + "”. They're near the top now."); }
+    await say("I don't see any current listings about “" + topic + "”, sorry. I can narrow by job type, remote or hybrid, a city, a minimum salary, or a skill, like “remote internships” or “Atlanta $55k”.");
+    return resultChips();
+  }
   await say("I can narrow by job type, remote or hybrid, a city, a minimum salary, or a skill. Try something like “remote internships” or “Atlanta $55k”.");
   resultChips();
 }
@@ -1222,7 +1329,7 @@ async function aiReply(text){
     '\nReply with only JSON: {"reply":"...","update":{"types":[],"workStyle":[],"places":[],"minPay":null,"addSkills":[],"addKeywords":[]},"search":true}. Use empty arrays/null for no change. types from Full-time, Internship, Part-time, Contract; workStyle from Remote, Hybrid, On-site. Set search true only if the update should change results.';
   let res = null;
   try { res = await withTimeout(cap.sample.json(prompt, { modelTier:"quick" }), 15000); } catch (e) { logEvent("ai_error","chat", e && e.code || "error"); }
-  await sleep(PREFS.fast ? 0 : 500);
+  await sleep(quick() ? 0 : 250);
   dots.remove(); $("status").textContent = ""; S.busy = false; setBusy(false);
   if (!res || typeof res.reply !== "string"){ addRow("bot", "I didn't catch that. I can filter by job type, remote, city, pay, or a skill."); return resultChips(); }
   const u = res.update || {}, A = x => Array.isArray(x) ? x.map(String).filter(Boolean) : [];
